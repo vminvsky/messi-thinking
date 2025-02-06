@@ -3,7 +3,7 @@
 # define some different generation templates
 from dataclasses import dataclass, field
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from .model_utils import model_paths
+from model_utils import model_paths
 import logging
 
 logging.basicConfig(

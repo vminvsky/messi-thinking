@@ -8,7 +8,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-from .model_utils import model_paths
+from model_utils import model_paths
 
 logging.basicConfig(
     level=logging.INFO,
