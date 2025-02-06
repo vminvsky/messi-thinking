@@ -1,8 +1,12 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from dynamic_decoder import DynamicTemperatureDecoder
 from config import DynamicDecodingConfig, DecayType
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 import matplotlib.pyplot as plt
+from dotenv import load_dotenv
+import json
+from prompts import REASONING_SYSTEM_PROMPT
+load_dotenv(override=True)
 
 def plot_temperature_history(temperature_history):
     plt.figure(figsize=(10, 5))
@@ -14,13 +18,15 @@ def plot_temperature_history(temperature_history):
     plt.show()
 
 # Load dataset and get reference thoughts
-ds = load_dataset("BAAI/TACO", split="train")
-reference_thoughts = [sample["question"] for sample in ds]
+print("Loading dataset")
+ds = load_from_disk("data/1k_taco_train")
+
 
 # Initialize model and tokenizer
-model_name = "gpt2"  # or your preferred model
-model = AutoModelForCausalLM.from_pretrained(model_name)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+print("Loading model and tokenizer")
+model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"  # or your preferred model
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
+tokenizer = AutoTokenizer.from_pretrained(model_name, device_map="auto")
 
 # Create config
 config = DynamicDecodingConfig(
@@ -34,14 +40,21 @@ decoder = DynamicTemperatureDecoder(
     model=model,
     tokenizer=tokenizer,
     config=config,
-    reference_thoughts=reference_thoughts
 )
 
-# Generate text
-prompt = "Let's solve this problem step by step:"
-result = decoder.generate(prompt, max_length=200)
 
-print("Generated Text:")
+# Add new reference thoughts
+print("\nAdding reference thoughts")
+new_thoughts = [sample["solutions"] for sample in ds][1:3]
+decoder.add_reference_thoughts(new_thoughts)
+
+# Generate with updated reference thoughts
+print("\nGenerating with updated reference thoughts:")
+prompt = ds[0]["question"]
+
+print("input prompt: ", prompt)
+result = decoder.generate(system_prompt=REASONING_SYSTEM_PROMPT, prompt=prompt, max_new_tokens=1024)
 print(result["generated_text"])
-print("\nTemperature History:")
+
+print("\nTemperature History:", result["temperature_history"])
 plot_temperature_history(result["temperature_history"]) 

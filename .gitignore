@@ -2,3 +2,6 @@
 .env
 uv.lock
 scratch.py
+samples/*
+data/*
+.cache/*
