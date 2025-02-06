@@ -1,0 +1,7 @@
+**/__pycache__/**
+.env
+uv.lock
+scratch.py
+samples/*
+data/*
+.cache/*

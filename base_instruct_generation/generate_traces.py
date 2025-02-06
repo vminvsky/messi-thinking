@@ -1,7 +1,7 @@
 from datasets import load_from_disk
 import json 
 import os 
-from .mm_generation_batch import MessiModels
+from mm_generation_batch import MessiModels
 import torch
 import gc
 from tqdm.auto import tqdm
@@ -41,6 +41,9 @@ def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, m
                          leave=False)
         
         for i in pbar_batch:
+            print('i', i)
+            # if i > 5:
+            #     continue 
             batch = dataset.select(range(i, min(i+batch_size, len(dataset))))
             prompts = [example['question'] for example in batch]
             
@@ -99,9 +102,9 @@ def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, m
         json.dump(metadata, f, indent=2)
 
 def main(output_dir: str = 'data/traces'):
-    max_tokens_total = 4000
-    max_base_tokens = 20
-    max_it_tokens = 50
+    max_tokens_total = 4096
+    max_base_tokens = 30
+    max_it_tokens = 50  
     temperature = 0.7
     repetitions = 8
     name_of_setting = f"{max_tokens_total}_{max_base_tokens}_{max_it_tokens}_{temperature}_{repetitions}"
