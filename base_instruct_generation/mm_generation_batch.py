@@ -224,7 +224,7 @@ class MessiModels:
 
     def load_model(self, model_path: str):
         self.logger.info(f"Loading model from {model_path}")
-        model = AutoModelForCausalLM.from_pretrained(model_path, device_map=self.device)
+        model = AutoModelForCausalLM.from_pretrained(model_path, device_map='auto')
         self.logger.info(f"Model loaded successfully to {self.device}")
         return model
 
