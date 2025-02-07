@@ -1,79 +1,134 @@
 import os
 import json
-
-from vllm import LLM, SamplingParams
 from datasets import load_dataset
-from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT
+from tqdm import tqdm
+from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED
+from openai import OpenAI
+import logging
+from vllm import LLM, SamplingParams
+from dynamic_scaling.prompt import generate_prompt
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Parameters
-K = 100  # tokens for base model generation per turn
-P = 100  # tokens for instruction model generation per turn
-NUM_SAMPLES = 1  # samples per dataset entry
-OUTPUT_DIR = "generated_samples"
+K = 30  # tokens for base model generation per turn
+P = 100  # tokens for instruct model generation per turn
+TOTAL_NEW_TOKENS = 8192
+NUM_SAMPLES = 6  # samples per dataset entry
+OUTPUT_DIR = "taco_medium_qwen_1.5b"
+
+def get_prompt(sample):
+    """Parse test cases and starter code from problem to create a prompt for the LLM."""
+    test_case = json.loads(sample["input_output"])
+    starter_code = sample["starter_code"]
+    # Generate prompt text using test case, question and starter code
+    prompt_text = generate_prompt(test_case, sample["question"], starter_code)
+    return [{"role": "system", "content": SKY_T1_FIXED}, {"role": "user", "content": prompt_text}]
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Instantiate OpenAI clients for each model
+# base_client = OpenAI(api_key="token-abc123", base_url="http://localhost:8052/v1")
+# instruct_client = OpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
+
+base_model = "Qwen/Qwen2-1.5B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+base_client = LLM(model=base_model, gpu_memory_utilization=0.4)
+instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4)
+base_sampling_params = SamplingParams(temperature=0.6, top_p=0.7, top_k=50, max_tokens=K)
+instruct_sampling_params = SamplingParams(temperature=0.6, top_p=0.7, top_k=50, max_tokens=P)
 
 # Load dataset and filter by difficulty
 _ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
 
-# Instantiate models
-base_model = LLM(model="Qwen/Qwen2-1.5B", gpu_memory_utilization=0.4)
-instruct_model = LLM(model="deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B", gpu_memory_utilization=0.4)
-
-# Sampling parameters
-base_sampling_params = SamplingParams(temperature=0.8, top_p=0.95, max_tokens=K)
-instruct_sampling_params = SamplingParams(temperature=0.5, max_tokens=P)
-
-# For each sample in the dataset
-for idx, sample in enumerate(_ds):
-    prompt = sample.get("question", sample.get("text", ""))
+for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
+    prompt = get_prompt(sample)
     if not prompt:
         continue
     for sample_num in range(NUM_SAMPLES):
+        output_filename = os.path.join(OUTPUT_DIR, f"question_{idx}_sample_{sample_num}.json")
+        if os.path.exists(output_filename):
+            logger.info(f"Output file {output_filename} exists, skipping sample {sample_num} for question_{idx}")
+            continue
         current_text = ""
+        total_generated_tokens = 0
         round_num = 0
-        while True:
-            if round_num % 2 == 0:
-                # Base model generation turn
-                input_text = SKY_T1_SYSTEM_PROMPT + "\n" + prompt + "\n" + current_text if current_text else prompt
-                if round_num == 0:
-                    input_text += " Solution: "
+        while total_generated_tokens < TOTAL_NEW_TOKENS:
+            if round_num % 2 == 1:
+                input_text = prompt[0]["content"] + "\n" + prompt[1]["content"] + " Solution: " + current_text
+                # logger.info(f"\n\nBase model generation turn {round_num}")
+                # logger.info(input_text)
+                # completion = base_client.completions.create(
+                #     model="Qwen/Qwen2-1.5B",
+                #     prompt=input_text,
+                #     max_tokens=K,
+                #     temperature=0.8,
+                #     top_p=0.95
+                # )
+                # generated = completion.choices[0].text#.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
                 
-                print(f"\n\nBase model generation turn {round_num}")
-                print(input_text)
-                outputs = base_model.generate([input_text], sampling_params=base_sampling_params)
-                generated = outputs[0].outputs[0].text
+                outputs = base_client.generate([input_text], sampling_params=base_sampling_params)
+                generated = outputs[0].outputs[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
+                # logger.info("\n\nGenerated:")
+                # logger.info(generated)
                 
-                print("\n\nGenerated:")
-                print(generated)
-                if not generated.strip():
+                tokens_generated = len(outputs[0].outputs[0].token_ids)
+                # print(tokens_generated)
+                if tokens_generated < K:
+                    logger.info("+++Less than K tokens generated by base model+++")
                     break
-                current_text += generated.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
+                current_text += generated
+                total_generated_tokens += tokens_generated
             else:
-                # Instruction model chat turn; complete the last message
                 conversation = [
-                    {"role": "system", "content": SKY_T1_SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": prompt[0]["content"]},
+                    {"role": "user", "content": prompt[1]["content"]},
                     {"role": "assistant", "content": current_text}
                 ]
-                print(f"\n\nInstruction model chat turn {round_num}")
-                print(current_text)
-                outputs = instruct_model.chat(conversation, sampling_params=instruct_sampling_params, use_tqdm=False, continue_final_message=True, add_generation_prompt=False)
-                generated = outputs[0].outputs[0].text
-                print("\n\nGenerated:")
-                print(generated)
-                if not generated.strip():
+                
+                # logger.info(f"\n\nInstruction model chat turn {round_num}")
+                # logger.info(current_text)
+                outputs = instruct_client.chat(
+                    conversation,
+                    sampling_params=instruct_sampling_params,
+                    continue_final_message=True,
+                    add_generation_prompt=False,
+                    use_tqdm=False
+                )
+                generated = outputs[0].outputs[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
+                # print(generated)
+                # logger.info("\n\nGenerated:")
+                # logger.info(generated)
+                tokens_generated = len(outputs[0].outputs[0].token_ids)
+                # print(tokens_generated)
+                if tokens_generated < P:
+                    logger.info("+++Less than P tokens generated by instruction model+++")
                     break
-                current_text += generated.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
+                current_text += generated
+                total_generated_tokens += tokens_generated
             round_num += 1
-        
-        # Save the generated output and metadata
+            if total_generated_tokens >= TOTAL_NEW_TOKENS:
+                logger.info("+++Total generated tokens reached TOTAL_NEW_TOKENS+++")
+                break
         output_data = {
             "prompt": prompt,
             "generated_text": current_text,
             "metadata": sample,
-            "sample_index": sample_num
+            "question_id": idx,
+            "sample_index": sample_num,
+            "generation_config": {
+                "base_model": base_model,
+                "instruct_model": instruct_model,
+                "base_temperature": base_sampling_params.temperature,
+                "base_top_p": base_sampling_params.top_p,
+                "base_top_k": base_sampling_params.top_k,
+                "base_max_tokens": base_sampling_params.max_tokens,
+                "instruct_temperature": instruct_sampling_params.temperature,
+                "instruct_top_p": instruct_sampling_params.top_p,
+                "instruct_top_k": instruct_sampling_params.top_k,
+                "instruct_max_tokens": instruct_sampling_params.max_tokens
+            }
         }
-        output_filename = os.path.join(OUTPUT_DIR, f"sample_{idx}_{sample_num}.json")
         with open(output_filename, "w") as f:
             json.dump(output_data, f, indent=2) 
