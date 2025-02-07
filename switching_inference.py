@@ -31,8 +31,8 @@ def get_prompt(sample):
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-base_model = "Qwen/Qwen-14B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+base_model = "meta-llama/Llama-3.1-70B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
 
 if USE_OPENAI:
     base_client = OpenAI(
@@ -103,11 +103,11 @@ for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
                         model=instruct_model,
                         messages=conversation,
                         max_tokens=P,
-                        temperature=0.6,
+                        temperature=0.7,
                         top_p=0.7,
                         top_k=50,
                         repetition_penalty=1,
-                        stop=["<｜end▁of▁sentence｜>"],
+                        stop=["<|endoftext|>"],
                         stream=False
                     )
                     generated = chat_completion.choices[0].message["content"].replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
