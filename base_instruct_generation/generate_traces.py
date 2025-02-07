@@ -1,4 +1,4 @@
-from datasets import load_from_disk
+from datasets import load_from_disk, load_dataset
 import json 
 import os 
 from mm_generation_batch import MessiModels
@@ -6,6 +6,8 @@ import torch
 import gc
 from tqdm.auto import tqdm
 import hashlib
+
+from prompt import SKY_T1_FIXED
 
 def get_question_id(question):
     """Generate a short, unique ID for a question"""
@@ -23,8 +25,8 @@ def save_sample(output_dir, question, sample_data, sample_num):
         f.flush()
         os.fsync(f.fileno())
 
-def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, max_base_tokens=5, max_it_tokens=30, temperature=0.7, repetitions=10):
-    mm = MessiModels(temperature=temperature)
+def generate_traces(dataset, output_dir, system_prompt, batch_size=32, max_tokens_total=2000, max_base_tokens=5, max_it_tokens=30, temperature=0.7, repetitions=10):
+    mm = MessiModels(temperature=temperature, system_prompt=system_prompt)
     
     # Track samples per question
     samples_count = {}
@@ -47,11 +49,11 @@ def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, m
             
             try:
                 print('generating base')
-                base_story = mm.generate_from_base(prompts, max_tokens=max_tokens_total)
+                # base_story = mm.generate_from_base(prompts, max_tokens=max_tokens_total)
                 print('generating it')
-                it_story = mm.generate_from_it(prompts, max_tokens=max_tokens_total)
+                # it_story = mm.generate_from_it(prompts, max_tokens=max_tokens_total)
                 print('generating both')
-                both_story, _ = mm.generate_from_both(prompts, max_tokens_total=max_tokens_total, max_base_tokens=max_base_tokens, max_it_tokens=max_it_tokens)
+                both_story = mm.generate_from_both(prompts, max_tokens_total=max_tokens_total, max_base_tokens=max_base_tokens, max_it_tokens=max_it_tokens)
                 
                 # Save each sample individually
                 for j, question in enumerate(prompts):
@@ -61,14 +63,14 @@ def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, m
                     
                     sample_data = {
                         "question": question,
-                        "base_story": base_story[j],
-                        "it_story": it_story[j],
+                        "base_story": "",# base_story[j],
+                        "it_story": "",# it_story[j],
                         "both_story": both_story[j],
                         "sample_num": samples_count[question],
                         "repetition": rep,
                         "batch": i
                     }
-                    
+                    print('saving sample')
                     save_sample(output_dir, question, sample_data, samples_count[question])
                     samples_count[question] += 1
                 
@@ -104,15 +106,17 @@ def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, m
 
 def main(output_dir: str = 'data/traces'):
     # max_tokens_total = 4096
-    max_tokens_total = 150
-    max_base_tokens = 30
-    max_it_tokens = 50  
+    max_tokens_total = 8192
+    max_base_tokens = 40
+    max_it_tokens = 60  
     temperature = 0.7
     repetitions = 8
     name_of_setting = f"{max_tokens_total}_{max_base_tokens}_{max_it_tokens}_{temperature}_{repetitions}"
     os.makedirs(os.path.join(output_dir, name_of_setting), exist_ok=True)
     
-    data = load_from_disk("data/1k_taco_train/")
+    data = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
+
+    # data = load_from_disk("data/1k_taco_train/")
 
     generate_traces(data, 
                     os.path.join(output_dir, name_of_setting), 
@@ -121,7 +125,8 @@ def main(output_dir: str = 'data/traces'):
                     max_base_tokens=max_base_tokens, 
                     max_it_tokens=max_it_tokens, 
                     temperature=temperature,
-                    repetitions=repetitions)
+                    repetitions=repetitions,
+                    system_prompt=SKY_T1_FIXED)
 
 if __name__ == "__main__":
     main()

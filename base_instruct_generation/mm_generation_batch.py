@@ -19,25 +19,26 @@ logging.basicConfig(
 def continue_generation_prompt(prompt: str):
     # replace the final occurance of <|im_end|>\n<|im_start|>assistant\n 
     # Find the last occurrence and only replace that one
-    last_idx = prompt.rindex("<|im_end|>\n<|im_start|>assistant\n")
-    text = prompt[:last_idx] + prompt[last_idx:].replace("<|im_end|>\n<|im_start|>assistant\n", "", 1)
+    # last_idx = prompt.rindex("<|im_end|>\n<|im_start|>assistant\n")
+    last_idx = prompt.rindex("<｜end▁of▁sentence｜><｜Assistant｜>")
+    text = prompt[:last_idx] + prompt[last_idx:].replace("<｜end▁of▁sentence｜><｜Assistant｜>", "", 1)
     return text
 
 @dataclass
 class MessiModels:
     base_model_path: str = field(default=model_paths["Qwen/Qwen2-1.5B"])
-    it_model_path: str = field(default=model_paths["Qwen/Qwen2-1.5B"])
+    it_model_path: str = field(default=model_paths["deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"])
     # it_model_path: str = field(default=model_paths["deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"])
     device: str = "cuda"
     temperature: float = 0.4
 
-    # system_prompt: str = field(default="Your role as an assistant involves thoroughly exploring questions through a systematic long thinking process before providing the final precise and accurate solutions. This requires engaging in a comprehensive cycle of analysis, summarizing, exploration, reassessment, reflection, backtracing, and iteration to develop well-considered thinking process. Please structure your response into two main sections: Thought and Solution. In the Thought section, detail your reasoning process using the specified format: <think> {thought with steps separated with ' '} </think> Each step should include detailed considerations such as analyzing questions, summarizing relevant findings, brainstorming new ideas, verifying the accuracy of the current steps, refining any errors, and revisiting previous steps. In the Solution section, based on various attempts, explorations, and reflections from the Thought section, systematically present the final solution that you deem correct. The solution should remain a logical, accurate, concise expression style and detail necessary step needed to reach the conclusion, formatted as follows: <|response|> {final formatted, precise, and clear solution} </response> Now, try to solve the following question through the above guidelines:")
-    system_prompt: str = field(default="You are a helpful assistant.")
+    system_prompt: str = field(default="Your role as an assistant involves thoroughly exploring questions through a systematic long thinking process before providing the final precise and accurate solutions. This requires engaging in a comprehensive cycle of analysis, summarizing, exploration, reassessment, reflection, backtracing, and iteration to develop well-considered thinking process. Please structure your response into two main sections: Thought and Solution. In the Thought section, detail your reasoning process using the specified format: <begin_of_thought> {thought with steps separated with ' '} <end_of_thought> Each step should include detailed considerations such as analyzing questions, summarizing relevant findings, brainstorming new ideas, verifying the accuracy of the current steps, refining any errors, and revisiting previous steps. In the Solution section, based on various attempts, explorations, and reflections from the Thought section, systematically present the final solution that you deem correct. The solution should remain a logical, accurate, concise expression style and detail necessary step needed to reach the conclusion, formatted as follows: <|response|> {final formatted, precise, and clear solution} </response> Now, try to solve the following question through the above guidelines:")
+    # system_prompt: str = field(default="You are a helpful assistant.")
 
     # TODO make sure to change this depending on the dataset
     base_suffix: str = field(default="Solution:")
 
-    verbose: bool = field(default=True)
+    verbose: bool = field(default=False)
 
     it_history: List[str] = field(default_factory=list)
     base_history: List[str] = field(default_factory=list)
@@ -57,6 +58,7 @@ class MessiModels:
         generate_solo: if True, we only generate base, if false we generate both base and it
         Returns a string for a single prompt or a list of strings for batched prompts.
         """
+        self.base_tokenizer.pad_token = self.base_tokenizer.eos_token
         # If a single string was passed, wrap it in a list.
         single_prompt = False
         if isinstance(prompt, str):
@@ -70,9 +72,9 @@ class MessiModels:
 
         self.logger.debug(f"Generating from base model for batch size {len(prompt)} with max tokens: {max_tokens}")
         
-        print("\033[94mprompt2:\033[0m", prompt2)  # Print in blue color
+        # print("\033[94mprompt2:\033[0m", prompt2)  # Print in blue color
         # Tokenize with padding
-        base_inputs = self.base_tokenizer(prompt2, return_tensors="pt", padding=True).to(self.device)
+        base_inputs = self.base_tokenizer(prompt2, return_tensors="pt", padding=True) #.to(self.device)
         base_input_ids = base_inputs.input_ids
         len_base_output = base_input_ids.shape[1]
 
@@ -81,7 +83,9 @@ class MessiModels:
             base_input_ids,
             attention_mask=base_inputs.attention_mask,
             max_new_tokens=max_tokens,
-            temperature=self.temperature
+            temperature=self.temperature,
+            do_sample=True,
+            pad_token_id=self.base_tokenizer.eos_token_id
         )
 
         # Determine where actual content starts (for left padding)
@@ -89,7 +93,7 @@ class MessiModels:
             input_lengths = base_inputs.attention_mask.sum(dim=1)
         else:
             input_lengths = (base_input_ids != self.base_tokenizer.pad_token_id).sum(dim=1)
-        print("input lengths", input_lengths)
+        # print("input lengths", input_lengths)
         # Extract generated text
         results = []
         for i, end_idx in enumerate(input_lengths):
@@ -99,11 +103,11 @@ class MessiModels:
             # Only get tokens generated after the prompt
             out_tokens_tensor = full_output[len_base_output:]
             out_string = self.base_tokenizer.decode(out_tokens_tensor, skip_special_tokens=True)
-            print("\033[94mout_string:\033[0m", out_string)  # Print in blue color
+            # print("\033[94mout_string:\033[0m", out_string)  # Print in blue color
             generated_token_count = out_tokens_tensor.size(0)
             out_tokens = "[BASE]" * generated_token_count
-            if self.verbose:
-                print(out_string)
+            # if self.verbose:
+            #     print(out_string)
             results.append((out_string, generated_token_count, out_tokens))
 
         return results[0] if single_prompt else results
@@ -115,6 +119,7 @@ class MessiModels:
         generate_solo: if True, we only generate it, if false we generate both base and it
         It applies a chat template to each prompt and then decodes the newly generated tokens.
         """
+        self.it_tokenizer.pad_token = self.it_tokenizer.eos_token
         single_prompt = False
         if isinstance(prompt, str):
             prompt = [prompt]
@@ -141,8 +146,8 @@ class MessiModels:
             )
             formatted_prompt = continue_generation_prompt(formatted_prompt)
             tokenized_prompts.append(formatted_prompt)
-        print("\033[93mtokenized_prompts:\033[0m", tokenized_prompts)  # Print in yellow color
-        tokens = self.it_tokenizer(tokenized_prompts, return_tensors="pt", padding=True).to(self.device)
+        # print("\033[93mtokenized_prompts:\033[0m", tokenized_prompts)  # Print in yellow color
+        tokens = self.it_tokenizer(tokenized_prompts, return_tensors="pt", padding=True) #.to(self.device)
         
         # Generate new tokens.
         it_output = self.it_model.generate(
@@ -151,6 +156,7 @@ class MessiModels:
             attention_mask=tokens.attention_mask,
             temperature=self.temperature,
             do_sample=True,
+            pad_token_id=self.it_tokenizer.eos_token_id
         )
 
         # Determine where actual content starts (for left padding)
@@ -165,7 +171,7 @@ class MessiModels:
             out_tokens_tensor = it_output[i, end_idx:]  # Generated tokens
             out_string = self.it_tokenizer.decode(out_tokens_tensor, skip_special_tokens=True)
             # print in yellow 
-            print("\033[93mout_string:\033[0m", out_string)  # Print in yellow color
+            # print("\033[93mout_string:\033[0m", out_string)  # Print in yellow color
             generated_token_count = out_tokens_tensor.size(0)
             out_tokens = "[INSTRUCT]" * generated_token_count
 
@@ -233,10 +239,8 @@ class MessiModels:
                 # Calculate max tokens for each prompt individually
                 max_tokens = [min(max_base_tokens, max_tokens_total - generated_tokens[i]) for i in indices]
                 self.logger.debug(f"Base generation step for indices {indices} with max tokens: {max_tokens}")
-                print("CURRENT PROMPTS", current_prompts)
                 # Batch process all prompts at once
                 base_results = self.generate_from_base(current_prompts, max_tokens=max(max_tokens), generate_solo=False)
-                print("BASE RESULTS", base_results)
                 # Update results for each prompt
                 for batch_idx, idx in enumerate(indices):
                     out_string, token_count, out_tokens = base_results[batch_idx]
@@ -247,17 +251,17 @@ class MessiModels:
 
         # self.logger.info(f"Completed alternating generation for batch. Generated tokens per prompt: {generated_tokens}")
         # Return a single tuple if only one prompt was processed; otherwise return lists.
-        return (prompts[0], LLM_source[0]) if batch_size == 1 else (prompts, LLM_source)
+        return (prompts, LLM_source) if batch_size == 1 else (prompts, LLM_source)
 
     def load_model(self, model_path: str):
         self.logger.info(f"Loading model from {model_path}")
-        model = AutoModelForCausalLM.from_pretrained(model_path, device_map='auto')
+        model = AutoModelForCausalLM.from_pretrained(model_path, device_map='auto', torch_dtype=torch.float16, trust_remote_code=True)
         self.logger.info(f"Model loaded successfully to {self.device}")
         return model
 
     def load_tokenizer(self, model_path: str):
         self.logger.info(f"Loading tokenizer from {model_path}")
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, device_map='auto')
         # Set the pad token to be the EOS token if not already set.
         tokenizer.pad_token = tokenizer.eos_token
         # Change padding side to left for decoder-only models
@@ -283,7 +287,7 @@ if __name__ == "__main__":
         "Write me a hundred word story about a cat.",
         # "Write me a hundred word story about a dog."
     ]
-    both_stories = mmg.generate_from_both(prompts, max_tokens_total=100)
+    both_stories = mmg.generate_from_both(prompts, max_tokens_total=1000)
     # base_stories = mmg.generate_from_base(prompts, max_tokens=100)
     # it_stories = mmg.generate_from_it(prompts, max_tokens=100)
     # print("\nBatched results:")
