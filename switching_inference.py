@@ -20,7 +20,7 @@ K = 30  # tokens for base model generation per turn
 P = 100  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "taco_medium_llama_70b"
+OUTPUT_DIR = "taco_medium_llama_8b"
 
 USE_OPENAI = False  # Set to True to use OpenAI client for inference
 USE_VLLM = True
@@ -49,10 +49,10 @@ if USE_OPENAI:
         base_url="https://api.openai.com/v1",
     )
 elif USE_VLLM:
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
-    instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
+    base_client = LLM(model=base_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=2)
+    instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=2)
 elif USE_MIX:
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=4)
+    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=2)
     instruct_client = Together(
         api_key=os.environ.get("TOGETHER_API_KEY"),
         base_url="https://api.together.xyz/v1",
