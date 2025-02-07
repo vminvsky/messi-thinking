@@ -34,8 +34,9 @@ def get_prompt(sample):
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-base_model = "meta-llama/Llama-3.1-70B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+base_model = "/scratch/gpfs/vv7718/models/hub/models--meta-llama--Meta-Llama-3.1-70B/snapshots/349b2ddb53ce8f2849a6c168a81980ab25258dac/"
+base_model = "meta-llama/Llama-3.1-8B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 
 if USE_OPENAI:
     base_client = OpenAI(
@@ -47,7 +48,7 @@ if USE_OPENAI:
         base_url="https://api.openai.com/v1",
     )
 else:
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True)
+    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=4)
     instruct_client = Together(
         api_key=os.environ.get("TOGETHER_API_KEY"),
         base_url="https://api.together.xyz/v1",
@@ -60,7 +61,7 @@ instruct_sampling_params = SamplingParams(temperature=0.6, top_p=0.7, top_k=50, 
 _ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
 
 for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
-    if idx < 100:
+    if idx < 1500:
         continue
     prompt = get_prompt(sample)
     if not prompt:
