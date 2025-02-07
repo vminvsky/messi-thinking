@@ -16,7 +16,7 @@ K = 30  # tokens for base model generation per turn
 P = 100  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "taco_medium_qwen_1.5b"
+OUTPUT_DIR = "llama_70b"
 
 def get_prompt(sample):
     """Parse test cases and starter code from problem to create a prompt for the LLM."""
@@ -32,8 +32,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # base_client = OpenAI(api_key="token-abc123", base_url="http://localhost:8052/v1")
 # instruct_client = OpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
 
-base_model = "Qwen/Qwen2-1.5B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+base_model = "meta-llama/Llama-3.1-70B-Instruct"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
 base_client = LLM(model=base_model, gpu_memory_utilization=0.4)
 instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4)
 base_sampling_params = SamplingParams(temperature=0.6, top_p=0.7, top_k=50, max_tokens=K)
@@ -43,6 +43,8 @@ instruct_sampling_params = SamplingParams(temperature=0.6, top_p=0.7, top_k=50, 
 _ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
 
 for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
+    if idx < 1500:
+        continue
     prompt = get_prompt(sample)
     if not prompt:
         continue
