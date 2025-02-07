@@ -17,10 +17,11 @@ K = 30  # tokens for base model generation per turn
 P = 100  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "taco_medium_qwen_1.5b"
+OUTPUT_DIR = "taco_medium_llama_70b"
 
 USE_OPENAI = False  # Set to True to use OpenAI client for inference
-
+USE_VLLM = True
+USE_MIX = False
 def get_prompt(sample):
     """Parse test cases and starter code from problem to create a prompt for the LLM."""
     test_case = json.loads(sample["input_output"])
@@ -31,8 +32,8 @@ def get_prompt(sample):
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-base_model = "meta-llama/Llama-3.1-70B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+base_model = "meta-llama/Llama-3.1-8B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 
 if USE_OPENAI:
     base_client = OpenAI(
@@ -43,8 +44,11 @@ if USE_OPENAI:
         api_key=os.environ.get("OPENAI_API_KEY"),
         base_url="https://api.openai.com/v1",
     )
-else:
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True)
+elif USE_VLLM:
+    base_client = LLM(model=base_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
+    instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
+elif USE_MIX:
+    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=4)
     instruct_client = Together(
         api_key=os.environ.get("TOGETHER_API_KEY"),
         base_url="https://api.together.xyz/v1",
@@ -98,7 +102,7 @@ for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
                     {"role": "user", "content": prompt[1]["content"]},
                     {"role": "assistant", "content": current_text}
                 ]
-                if not USE_OPENAI:
+                if USE_OPENAI or USE_MIX:
                     chat_completion = instruct_client.chat.completions.create(
                         model=instruct_model,
                         messages=conversation,
