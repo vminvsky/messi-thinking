@@ -41,15 +41,16 @@ def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, m
                          leave=False)
         
         for i in pbar_batch:
-            print('i', i)
-            # if i > 5:
-            #     continue 
+            print(i)
             batch = dataset.select(range(i, min(i+batch_size, len(dataset))))
             prompts = [example['question'] for example in batch]
             
             try:
+                print('generating base')
                 base_story = mm.generate_from_base(prompts, max_tokens=max_tokens_total)
+                print('generating it')
                 it_story = mm.generate_from_it(prompts, max_tokens=max_tokens_total)
+                print('generating both')
                 both_story, _ = mm.generate_from_both(prompts, max_tokens_total=max_tokens_total, max_base_tokens=max_base_tokens, max_it_tokens=max_it_tokens)
                 
                 # Save each sample individually
@@ -102,7 +103,8 @@ def generate_traces(dataset, output_dir, batch_size=32, max_tokens_total=2000, m
         json.dump(metadata, f, indent=2)
 
 def main(output_dir: str = 'data/traces'):
-    max_tokens_total = 4096
+    # max_tokens_total = 4096
+    max_tokens_total = 150
     max_base_tokens = 30
     max_it_tokens = 50  
     temperature = 0.7
