@@ -4,51 +4,55 @@ from datasets import load_dataset
 from tqdm import tqdm
 from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED
 from together import Together
-from openai import OpenAI
+from openai import AsyncOpenAI
 import logging
 from vllm import LLM, SamplingParams
 from dynamic_scaling.prompt import generate_prompt
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Parameters
-K = 30  # tokens for base model generation per turn
-P = 100  # tokens for instruct model generation per turn
+K = 50  # tokens for base model generation per turn
+P = 300  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "taco_medium_llama_70b"
+OUTPUT_DIR = "taco_medium_llama_8b"
+
+TENSOR_PARALLEL_SIZE = 2
 
 USE_OPENAI = False  # Set to True to use OpenAI client for inference
 USE_VLLM = True
 USE_MIX = False
+
 def get_prompt(sample):
     """Parse test cases and starter code from problem to create a prompt for the LLM."""
     test_case = json.loads(sample["input_output"])
     starter_code = sample["starter_code"]
-    # Generate prompt text using test case, question and starter code
     prompt_text = generate_prompt(test_case, sample["question"], starter_code)
     return [{"role": "system", "content": SKY_T1_FIXED}, {"role": "user", "content": prompt_text}]
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-base_model = "meta-llama/Llama-3.1-8B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+base_model = "meta-llama/Llama-3.1-70B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 if USE_OPENAI:
-    base_client = OpenAI(
+    base_client = AsyncOpenAI(
         api_key=os.environ.get("OPENAI_API_KEY"),
         base_url="https://api.openai.com/v1",
     )
-    instruct_client = OpenAI(
+    instruct_client = AsyncOpenAI(
         api_key=os.environ.get("OPENAI_API_KEY"),
         base_url="https://api.openai.com/v1",
     )
 elif USE_VLLM:
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
-    instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
+    base_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8051/v1")
+    instruct_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
 elif USE_MIX:
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=4)
+    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=TENSOR_PARALLEL_SIZE)
     instruct_client = Together(
         api_key=os.environ.get("TOGETHER_API_KEY"),
         base_url="https://api.together.xyz/v1",
@@ -57,102 +61,122 @@ elif USE_MIX:
 base_sampling_params = SamplingParams(temperature=0.6, top_p=0.7, top_k=50, max_tokens=K)
 instruct_sampling_params = SamplingParams(temperature=0.6, top_p=0.7, top_k=50, max_tokens=P)
 
-# Load dataset and filter by difficulty
 _ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
 
-for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
-    if idx < 100:
-        continue
-    prompt = get_prompt(sample)
-    if not prompt:
-        continue
-    for sample_num in range(NUM_SAMPLES):
-        output_filename = os.path.join(OUTPUT_DIR, f"question_{idx}_sample_{sample_num}.json")
-        if os.path.exists(output_filename):
-            logger.info(f"Output file {output_filename} exists, skipping sample {sample_num} for question_{idx}")
-            continue
-        current_text = ""
-        total_generated_tokens = 0
-        round_num = 0
-        while total_generated_tokens < TOTAL_NEW_TOKENS:
-            if round_num % 2 == 1:
-                input_text = prompt[0]["content"] + "\n" + prompt[1]["content"] + " Solution: " + current_text
-                if USE_OPENAI:
-                    completion = base_client.completions.create(
-                        model="Qwen/Qwen2-1.5B",
-                        prompt=input_text,
-                        max_tokens=K,
-                        temperature=0.8,
-                        top_p=0.95
-                    )
-                    generated = completion.choices[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
-                    tokens_generated = len(generated.split())
-                else:
-                    outputs = base_client.generate([input_text], sampling_params=base_sampling_params)
-                    generated = outputs[0].outputs[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
-                    tokens_generated = len(outputs[0].outputs[0].token_ids)
-                if tokens_generated < K:
-                    logger.info("+++Less than K tokens generated by base model+++")
-                    break
+async def perform_base_inference(input_text):
+    if USE_OPENAI:
+        completion = await asyncio.to_thread(
+            base_client.completions.create,
+            model=base_model,
+            prompt=input_text,
+            max_tokens=K,
+            temperature=0.8,
+            top_p=0.95
+        )
+        generated = completion.choices[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
+        tokens_generated = len(generated.split())
+    else:
+        completion = await base_client.completions.create(
+            model=base_model,
+            prompt=input_text,
+            max_tokens=K,
+            temperature=0.8,
+            top_p=0.95
+        )
+        generated = completion.choices[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
+        tokens_generated = completion.usage.completion_tokens
+    return generated, tokens_generated
+
+async def perform_instruct_inference(conversation):
+    chat_completion = await instruct_client.chat.completions.create(
+        model=instruct_model,
+        messages=conversation,
+        max_tokens=P,
+        temperature=0.7,
+        top_p=0.7,
+        extra_body={"continue_final_message": True, 
+                "add_generation_prompt": False},
+    )
+    generated = chat_completion.choices[0].message.content.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
+    tokens_generated = chat_completion.usage.completion_tokens
+    return generated, tokens_generated
+
+async def process_sample(idx, sample, sample_num, prompt, output_filename):
+    current_text = ""
+    total_generated_tokens = 0
+    round_num = 0
+    while total_generated_tokens < TOTAL_NEW_TOKENS:
+        if round_num % 2 == 1:
+            input_text = prompt[0]["content"] + "\n" + prompt[1]["content"] + " Solution: " + current_text
+            generated, tokens_generated = await perform_base_inference(input_text)
+            if tokens_generated < K:
                 current_text += generated
                 total_generated_tokens += tokens_generated
-            else:
-                conversation = [
-                    {"role": "system", "content": prompt[0]["content"]},
-                    {"role": "user", "content": prompt[1]["content"]},
-                    {"role": "assistant", "content": current_text}
-                ]
-                if USE_OPENAI or USE_MIX:
-                    chat_completion = instruct_client.chat.completions.create(
-                        model=instruct_model,
-                        messages=conversation,
-                        max_tokens=P,
-                        temperature=0.7,
-                        top_p=0.7,
-                        top_k=50,
-                        repetition_penalty=1,
-                        stop=["<|endoftext|>"],
-                        stream=False
-                    )
-                    generated = chat_completion.choices[0].message["content"].replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
-                    tokens_generated = len(generated.split())
-                else:
-                    outputs = instruct_client.chat(
-                        conversation,
-                        sampling_params=instruct_sampling_params,
-                        continue_final_message=True,
-                        add_generation_prompt=False,
-                        use_tqdm=False
-                    )
-                    generated = outputs[0].outputs[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
-                    tokens_generated = len(outputs[0].outputs[0].token_ids)
-                if tokens_generated < P:
-                    logger.info("+++Less than P tokens generated by instruction model+++")
-                    break
-                current_text += generated
-                total_generated_tokens += tokens_generated
-            round_num += 1
-            if total_generated_tokens >= TOTAL_NEW_TOKENS:
-                logger.info("+++Total generated tokens reached TOTAL_NEW_TOKENS+++")
+                logger.info("+++Less than K tokens generated by base model+++")
                 break
-        output_data = {
-            "prompt": prompt,
-            "generated_text": current_text,
-            "metadata": sample,
-            "question_id": idx,
-            "sample_index": sample_num,
-            "generation_config": {
-                "base_model": base_model,
-                "instruct_model": instruct_model,
-                "base_temperature": base_sampling_params.temperature,
-                "base_top_p": base_sampling_params.top_p,
-                "base_top_k": base_sampling_params.top_k,
-                "base_max_tokens": base_sampling_params.max_tokens,
-                "instruct_temperature": instruct_sampling_params.temperature,
-                "instruct_top_p": instruct_sampling_params.top_p,
-                "instruct_top_k": instruct_sampling_params.top_k,
-                "instruct_max_tokens": instruct_sampling_params.max_tokens
-            }
+            current_text += generated
+            total_generated_tokens += tokens_generated
+        else:
+            conversation = [
+                {"role": "system", "content": prompt[0]["content"]},
+                {"role": "user", "content": prompt[1]["content"]},
+                {"role": "assistant", "content": "<think>" + current_text}
+            ]
+            generated, tokens_generated = await perform_instruct_inference(conversation)
+            if tokens_generated < P:
+                current_text += generated
+                total_generated_tokens += tokens_generated
+                logger.info("+++Less than P tokens generated by instruction model+++")
+                break
+            current_text += generated
+            total_generated_tokens += tokens_generated
+        round_num += 1
+        if total_generated_tokens >= TOTAL_NEW_TOKENS:
+            logger.info("+++Total generated tokens reached TOTAL_NEW_TOKENS+++")
+            break
+    output_data = {
+        "prompt": prompt,
+        "generated_text": "[begin_of_thought]" + current_text,
+        "metadata": sample,
+        "question_id": idx,
+        "sample_index": sample_num,
+        "generation_config": {
+            "base_model": base_model,
+            "instruct_model": instruct_model,
+            "base_temperature": base_sampling_params.temperature,
+            "base_top_p": base_sampling_params.top_p,
+            "base_top_k": base_sampling_params.top_k,
+            "base_max_tokens": base_sampling_params.max_tokens,
+            "instruct_temperature": instruct_sampling_params.temperature,
+            "instruct_top_p": instruct_sampling_params.top_p,
+            "instruct_top_k": instruct_sampling_params.top_k,
+            "instruct_max_tokens": instruct_sampling_params.max_tokens
         }
-        with open(output_filename, "w") as f:
-            json.dump(output_data, f, indent=2) 
+    }
+    with open(output_filename, "w") as f:
+        json.dump(output_data, f, indent=2)
+
+async def main():
+    semaphore = asyncio.Semaphore(10)
+    tasks = []
+    for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
+        if idx < 100:
+            continue
+        prompt = get_prompt(sample)
+        if not prompt:
+            continue
+        for sample_num in range(NUM_SAMPLES):
+            output_filename = os.path.join(OUTPUT_DIR, f"question_{idx}_sample_{sample_num}.json")
+            if os.path.exists(output_filename):
+                logger.info(f"Output file {output_filename} exists, skipping sample {sample_num} for question_{idx}")
+                continue
+            tasks.append(asyncio.create_task(limited_process_sample(semaphore, idx, sample, sample_num, prompt, output_filename)))
+    for task in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Waiting for tasks"):
+        await task
+
+async def limited_process_sample(semaphore, idx, sample, sample_num, prompt, output_filename):
+    async with semaphore:
+        await process_sample(idx, sample, sample_num, prompt, output_filename)
+
+if __name__ == "__main__":
+    asyncio.run(main()) 
