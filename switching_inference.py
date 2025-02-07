@@ -20,10 +20,11 @@ K = 30  # tokens for base model generation per turn
 P = 100  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "llama_70b"
+OUTPUT_DIR = "taco_medium_llama_70b"
 
 USE_OPENAI = False  # Set to True to use OpenAI client for inference
-
+USE_VLLM = True
+USE_MIX = False
 def get_prompt(sample):
     """Parse test cases and starter code from problem to create a prompt for the LLM."""
     test_case = json.loads(sample["input_output"])
@@ -47,7 +48,10 @@ if USE_OPENAI:
         api_key=os.environ.get("OPENAI_API_KEY"),
         base_url="https://api.openai.com/v1",
     )
-else:
+elif USE_VLLM:
+    base_client = LLM(model=base_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
+    instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=4)
+elif USE_MIX:
     base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=4)
     instruct_client = Together(
         api_key=os.environ.get("TOGETHER_API_KEY"),
@@ -102,7 +106,7 @@ for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
                     {"role": "user", "content": prompt[1]["content"]},
                     {"role": "assistant", "content": current_text}
                 ]
-                if not USE_OPENAI:
+                if USE_OPENAI or USE_MIX:
                     chat_completion = instruct_client.chat.completions.create(
                         model=instruct_model,
                         messages=conversation,
