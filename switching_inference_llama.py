@@ -19,7 +19,7 @@ K = 50  # tokens for base model generation per turn
 P = 300  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "taco_medium_qwen_32b"
+OUTPUT_DIR = "taco_medium_llama-8b"
 
 TENSOR_PARALLEL_SIZE = 2
 
@@ -36,8 +36,9 @@ def get_prompt(sample):
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-base_model = "Qwen/Qwen2.5-32B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+
+base_model = "meta-llama/Llama-3.1-8B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 
 if USE_OPENAI:
     base_client = AsyncOpenAI(
