@@ -54,7 +54,6 @@ elif USE_VLLM:
     instruct_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
 elif USE_MIX:
     base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=TENSOR_PARALLEL_SIZE)
-
     instruct_client = Together(
         api_key=os.environ.get("TOGETHER_API_KEY"),
         base_url="https://api.together.xyz/v1",
