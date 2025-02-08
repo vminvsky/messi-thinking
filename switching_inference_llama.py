@@ -108,8 +108,7 @@ async def process_sample(idx, sample, sample_num, prompt, output_filename):
     round_num = 0
     while total_generated_tokens < TOTAL_NEW_TOKENS:
         if round_num % 2 == 1:
-            # input_text = BASE_MODEL_SYSTEM_PROMPT.format(Question=prompt[1]["content"]) + " Assistant: " + current_text
-            input_text = QWEN_BASE_MODEL_PROMPT + prompt[1]["content"] + "<|im_end|>\n<|im_start|>assistant\n" + current_text
+            input_text = BASE_MODEL_SYSTEM_PROMPT + prompt[1]["content"] + "\nAssistant:\n" + current_text
             generated, tokens_generated = await perform_base_inference(input_text)
             if tokens_generated < K:
                 current_text += generated
