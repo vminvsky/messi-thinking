@@ -20,11 +20,8 @@ P = 300  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
 OUTPUT_DIR = "taco_medium_llama_8b"
-<<<<<<< HEAD
-=======
 
 TENSOR_PARALLEL_SIZE = 2
->>>>>>> 4d39852e0c67cefab8c114221b46b08a5a8ee649
 
 USE_OPENAI = False  # Set to True to use OpenAI client for inference
 USE_VLLM = True
@@ -39,8 +36,8 @@ def get_prompt(sample):
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-base_model = "meta-llama/Llama-3.1-70B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+base_model = "Qwen/Qwen2.5-32B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 
 if USE_OPENAI:
     base_client = AsyncOpenAI(
@@ -52,17 +49,10 @@ if USE_OPENAI:
         base_url="https://api.openai.com/v1",
     )
 elif USE_VLLM:
-<<<<<<< HEAD
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=2)
-    instruct_client = LLM(model=instruct_model, gpu_memory_utilization=0.4, trust_remote_code=True, tensor_parallel_size=2)
-elif USE_MIX:
-    base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=2)
-=======
     base_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8051/v1")
     instruct_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
 elif USE_MIX:
     base_client = LLM(model=base_model, gpu_memory_utilization=0.8, trust_remote_code=True, tensor_parallel_size=TENSOR_PARALLEL_SIZE)
->>>>>>> 4d39852e0c67cefab8c114221b46b08a5a8ee649
     instruct_client = Together(
         api_key=os.environ.get("TOGETHER_API_KEY"),
         base_url="https://api.together.xyz/v1",
