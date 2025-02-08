@@ -19,7 +19,7 @@ K = 50  # tokens for base model generation per turn
 P = 300  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "taco_medium_llama_8b"
+OUTPUT_DIR = "taco_medium_llama_8b_messy_reasoning"
 
 TENSOR_PARALLEL_SIZE = 2
 
