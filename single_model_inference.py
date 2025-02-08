@@ -25,41 +25,30 @@ instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 USE_OPENAI = True
 
 
-base_client = AsyncOpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-    base_url="https://api.openai.com/v1",
-)
-instruct_client = AsyncOpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-    base_url="https://api.openai.com/v1",
-)
+base_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8051/v1")
+instruct_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
+
+def get_prompt(sample):
+    """Parse test cases and starter code from problem to create a prompt for the LLM."""
+    test_case = json.loads(sample["input_output"])
+    starter_code = sample["starter_code"]
+    prompt_text = generate_prompt(test_case, sample["question"], starter_code)
+    return [{"role": "system", "content": SKY_T1_FIXED}, {"role": "user", "content": prompt_text}]
 
 def get_prompt_instruct(sample):
-    test_case = json.loads(sample["input_output"])
-    starter_code = sample["starter_code"]
-    prompt_text = generate_prompt(test_case, sample["question"], starter_code)
-    return [
-        {"role": "system", "content": SKY_T1_FIXED},
-        {"role": "user", "content": prompt_text}
-    ]
+    return get_prompt(sample)
     
 def get_prompt_base(sample):
-    test_case = json.loads(sample["input_output"])
-    starter_code = sample["starter_code"]
-    prompt_text = generate_prompt(test_case, sample["question"], starter_code)
-    return BASE_MODEL_SYSTEM_PROMPT.format(Question=prompt_text)
+    prompt = get_prompt(sample)
+    return BASE_MODEL_SYSTEM_PROMPT + prompt[1]["content"] + "\nAssistant:\n[begin_of_thought]"
 
 async def perform_base_inference(input_text):
-    
-    print(input_text)
-    completion = await asyncio.to_thread(
-        base_client.completions.create,
+    completion = await base_client.completions.create(
         model=base_model,
         prompt=input_text,
         max_tokens=MAX_TOKENS,
         temperature=0.8,
-        top_p=0.95
-    )
+        top_p=0.95)
     generated = completion.choices[0].text.replace("</think>", "[end_of_thought]").replace("<think>", "[begin_of_thought]")
     return generated
 
@@ -82,7 +71,7 @@ async def process_sample(idx, sample, sample_num, prompt, output_filename, model
         generated = await perform_instruct_inference(conversation)
     output_data = {
         "prompt": prompt,
-        "generated_text": "[begin_of_thought]" + generated,
+        "generated_text": generated,
         "metadata": sample,
         "question_id": idx,
         "sample_index": sample_num,
@@ -107,7 +96,7 @@ async def limited_process_sample(semaphore, idx, sample, sample_num, prompt, out
         await process_sample(idx, sample, sample_num, prompt, output_filename, model_flag)
 
 async def main(model_flag):
-    semaphore = asyncio.Semaphore(1)
+    semaphore = asyncio.Semaphore(200)
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
