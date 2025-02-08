@@ -2,7 +2,7 @@ import os
 import json
 from datasets import load_dataset
 from tqdm import tqdm
-from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED
+from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED, BASE_MODEL_SYSTEM_PROMPT
 from together import Together
 from openai import AsyncOpenAI
 import logging
@@ -36,8 +36,13 @@ def get_prompt(sample):
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+<<<<<<< HEAD
 base_model = "Qwen/Qwen2.5-32B"
 instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+=======
+base_model = "meta-llama/Llama-3.1-8B"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+>>>>>>> a51a13fcdd211b6d167349cdcb579c90785c13bf
 
 if USE_OPENAI:
     base_client = AsyncOpenAI(
@@ -107,7 +112,7 @@ async def process_sample(idx, sample, sample_num, prompt, output_filename):
     round_num = 0
     while total_generated_tokens < TOTAL_NEW_TOKENS:
         if round_num % 2 == 1:
-            input_text = prompt[0]["content"] + "\n" + prompt[1]["content"] + " Solution: " + current_text
+            input_text = BASE_MODEL_SYSTEM_PROMPT.format(Question=prompt[1]["content"]) + " Assistant: " + current_text
             generated, tokens_generated = await perform_base_inference(input_text)
             if tokens_generated < K:
                 current_text += generated
@@ -157,11 +162,9 @@ async def process_sample(idx, sample, sample_num, prompt, output_filename):
         json.dump(output_data, f, indent=2)
 
 async def main():
-    semaphore = asyncio.Semaphore(10)
+    semaphore = asyncio.Semaphore(100)
     tasks = []
     for idx, sample in tqdm(enumerate(_ds), desc="Processing samples"):
-        if idx < 100:
-            continue
         prompt = get_prompt(sample)
         if not prompt:
             continue
