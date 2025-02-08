@@ -2,7 +2,7 @@ import os
 import json
 from datasets import load_dataset
 from tqdm import tqdm
-from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED, BASE_MODEL_SYSTEM_PROMPT
+from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED, BASE_MODEL_SYSTEM_PROMPT, QWEN_BASE_MODEL_PROMPT
 from together import Together
 from openai import AsyncOpenAI
 import logging
@@ -19,7 +19,7 @@ K = 50  # tokens for base model generation per turn
 P = 300  # tokens for instruct model generation per turn
 TOTAL_NEW_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
-OUTPUT_DIR = "taco_medium_llama_8b"
+OUTPUT_DIR = "taco_medium_qwen_32b"
 
 TENSOR_PARALLEL_SIZE = 2
 
@@ -36,13 +36,8 @@ def get_prompt(sample):
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-<<<<<<< HEAD
 base_model = "Qwen/Qwen2.5-32B"
 instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
-=======
-base_model = "meta-llama/Llama-3.1-8B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
->>>>>>> a51a13fcdd211b6d167349cdcb579c90785c13bf
 
 if USE_OPENAI:
     base_client = AsyncOpenAI(
@@ -112,7 +107,8 @@ async def process_sample(idx, sample, sample_num, prompt, output_filename):
     round_num = 0
     while total_generated_tokens < TOTAL_NEW_TOKENS:
         if round_num % 2 == 1:
-            input_text = BASE_MODEL_SYSTEM_PROMPT.format(Question=prompt[1]["content"]) + " Assistant: " + current_text
+            # input_text = BASE_MODEL_SYSTEM_PROMPT.format(Question=prompt[1]["content"]) + " Assistant: " + current_text
+            input_text = QWEN_BASE_MODEL_PROMPT + prompt[1]["content"] + "<|im_end|>\n<|im_start|>assistant\n" + current_text
             generated, tokens_generated = await perform_base_inference(input_text)
             if tokens_generated < K:
                 current_text += generated
@@ -125,7 +121,7 @@ async def process_sample(idx, sample, sample_num, prompt, output_filename):
             conversation = [
                 {"role": "system", "content": prompt[0]["content"]},
                 {"role": "user", "content": prompt[1]["content"]},
-                {"role": "assistant", "content": "<think>" + current_text}
+                {"role": "assistant", "content": "[begin_of_thought]" + current_text}
             ]
             generated, tokens_generated = await perform_instruct_inference(conversation)
             if tokens_generated < P:
