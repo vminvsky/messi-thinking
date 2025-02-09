@@ -23,9 +23,9 @@ use_slerp = True
 merge_frac = "0.90"
 base_model = "meta-llama/Llama-3.1-8B"
 if use_slerp:
-    instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-{merge_frac}/"
+    instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-{merge_frac}"
 else:
-    instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-{merge_frac}/"
+    instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-{merge_frac}"
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
