@@ -17,9 +17,11 @@ logger = logging.getLogger(__name__)
 MAX_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
 
+OUTPUT_DIR = "taco_medium_llama-3.1-8b-mixed-slerp-0.70_messy_reasoning"
+
 # Models
 base_model = "meta-llama/Llama-3.1-8B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+instruct_model = "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-0.70"
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
@@ -117,9 +119,5 @@ if __name__ == "__main__":
     parser.add_argument("--model", choices=["base", "instruct"], required=True, help="Select model for inference (base or instruct)")
     args = parser.parse_args()
     MODEL_FLAG = args.model
-    if MODEL_FLAG == "base":
-        OUTPUT_DIR = "taco_base_llama_8b_single"
-    else:
-        OUTPUT_DIR = "taco_instruct_llama_8b_single"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     asyncio.run(main(MODEL_FLAG)) 
