@@ -20,6 +20,7 @@ NUM_SAMPLES = 6  # samples per dataset entry
 OUTPUT_DIR = "taco_medium_llama_8b_messy_reasoning"
 
 # Models
+merge_frac = "0.90"
 base_model = "meta-llama/Llama-3.1-8B"
 instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 
@@ -98,7 +99,7 @@ async def limited_process_sample(semaphore, idx, sample, sample_num, prompt, out
         await process_sample(idx, sample, sample_num, prompt, output_filename, model_flag)
 
 async def main(model_flag):
-    semaphore = asyncio.Semaphore(200)
+    semaphore = asyncio.Semaphore(150)
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
@@ -120,5 +121,12 @@ if __name__ == "__main__":
     parser.add_argument("--model", choices=["base", "instruct"], required=True, help="Select model for inference (base or instruct)")
     args = parser.parse_args()
     MODEL_FLAG = args.model
+    if MODEL_FLAG == "base":
+        OUTPUT_DIR = f"taco_base_llama_8b_single_{merge_frac}"
+    else:
+        if use_slerp:
+            OUTPUT_DIR = f"taco_instruct_llama_8b_single_slerp_{merge_frac}"
+        else:
+            OUTPUT_DIR = f"taco_instruct_llama_8b_single_{merge_frac}"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     asyncio.run(main(MODEL_FLAG)) 
