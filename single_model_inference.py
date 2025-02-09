@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 MAX_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
 
-use_slerp = True
+OUTPUT_DIR = "taco_medium_llama_8b_messy_reasoning"
 
+use_slerp = True 
 # Models
 merge_frac = "0.90"
 base_model = "meta-llama/Llama-3.1-8B"
@@ -106,6 +107,7 @@ async def main(model_flag):
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
+
         prompt = get_prompt_base(sample) if model_flag == "base" else get_prompt_instruct(sample)
         if not prompt:
             continue

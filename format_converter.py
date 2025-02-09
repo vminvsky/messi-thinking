@@ -58,7 +58,7 @@ def process_file(file_path, api_key_cycle):
     # elif not correctness:
     #     print(f"Skipping {file_path} because it is not correct")
     #     return file_path, file_path
-    content = data.get("generated_text", "")
+    content = data.get("generated_text", "").replace("[end_of_thought][begin_of_thought]", "[begin_of_thought]")
     api_key = next(api_key_cycle)
     processed = process_content(content, api_key)
     data["converted_text"] = processed
