@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 MAX_TOKENS = 8192
 NUM_SAMPLES = 6  # samples per dataset entry
 
-OUTPUT_DIR = "taco_medium_llama-3.1-8b-mixed-slerp-0.70_messy_reasoning"
+OUTPUT_DIR = "taco_medium_llama_8b_messy_reasoning"
 
 # Models
 base_model = "meta-llama/Llama-3.1-8B"
-instruct_model = "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-0.70"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
@@ -102,6 +102,7 @@ async def main(model_flag):
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
+
         prompt = get_prompt_base(sample) if model_flag == "base" else get_prompt_instruct(sample)
         if not prompt:
             continue
