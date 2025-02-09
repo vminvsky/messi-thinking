@@ -6,6 +6,8 @@ SKY_T1_FIXED = "Your role as an assistant involves thoroughly exploring question
 
 BASE_MODEL_SYSTEM_PROMPT = """A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within [begin_of_thought] [begin_of_thought] and [begin_of_solution] [begin_of_solution] tags, respectively, i.e., [begin_of_thought] reasoning process here [end_of_thought] [begin_of_solution] answer here [end_of_solution]. User:"""
 
+QWEN_BASE_MODEL_PROMPT = """<|im_start|>system\nPlease reason step by step, and put your final answer within \boxed{}.<|im_end|>\n<|im_start|>user\n"""
+
 # For data generation using deepseek-r1
 SKY_T1_SYSTEM_PROMPT = """
 Your role as an assistant involves thoroughly exploring questions through a systematic long thinking process
