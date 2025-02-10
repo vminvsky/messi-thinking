@@ -48,6 +48,9 @@ def process_file(file_path, api_key_cycle):
     if "converted_" in file_path:
         print(f"Skipping {file_path} because it is already converted")
         return file_path, file_path
+    if "converted_" + os.path.basename(file_path) in os.listdir(os.path.dirname(file_path)):
+        print(f"Skipping {file_path} because it is already converted")
+        return file_path, file_path
     with open(file_path, "r") as f:
         data = json.load(f)
     correctness = data.get("correctness", None)
