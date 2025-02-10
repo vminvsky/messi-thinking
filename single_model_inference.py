@@ -15,14 +15,15 @@ logger = logging.getLogger(__name__)
 
 # Parameters
 MAX_TOKENS = 8192
-NUM_SAMPLES = 6  # samples per dataset entry
+NUM_SAMPLES = 10  # samples per dataset entry
 
-OUTPUT_DIR = "taco_medium_llama_8b_messy_reasoning"
+
+use_slerp = True
 
 # Models
-merge_frac = "0.90"
+merge_frac = "0.7"
 base_model = "meta-llama/Llama-3.1-8B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+instruct_model = "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-0.70"
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
