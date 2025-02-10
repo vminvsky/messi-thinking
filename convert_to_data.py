@@ -16,6 +16,11 @@ def main():
     # Iterate through all files in the input directory
     for filename in tqdm(os.listdir(args.input_dir), desc="Processing files"):
         if filename.endswith(".json") and filename.startswith("converted_"):
+            # skip questions with id 500 or higher
+            if int(filename.split("_")[2]) >= 500:
+                print(f"Skipping {filename} because it has id {filename.split('_')[1]}")
+                continue
+            
             filepath = os.path.join(args.input_dir, filename)
             with open(filepath, "r") as f:
                 sample = json.load(f)
