@@ -8,8 +8,11 @@ from itertools import cycle
 import openai
 from tqdm import tqdm
 
+from dotenv import load_dotenv
+
 from dynamic_scaling.prompt import convert_prompt, convert_prompt_example
 
+load_dotenv()
 
 def set_openai_key(api_key):
     openai.api_key = api_key
@@ -71,6 +74,9 @@ def process_file(file_path, api_key_cycle):
 def process_file_wrapper(args):
     return process_file(*args)
 
+def extract_question_num(file_path):
+    question_num = file_path.split('question_')[1].split('_')[0]
+    return question_num
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process sample files from switching_inference output and convert their format.")
@@ -83,6 +89,15 @@ if __name__ == "__main__":
     api_key_cycle = cycle(api_keys)
 
     file_paths = [os.path.join(args.input_dir, filename) for filename in os.listdir(args.input_dir) if filename.endswith(".json")]
+
+    # Filter file_paths based on question numbers < 500
+    filtered_file_paths = []
+    for file_path in file_paths:
+        question_num = extract_question_num(file_path)
+        if question_num is not None and int(question_num) < 500:
+            filtered_file_paths.append(file_path)
+    
+    file_paths = filtered_file_paths
     
     results = []
     with mp.Pool(os.cpu_count()) as pool:
