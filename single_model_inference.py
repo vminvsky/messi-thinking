@@ -20,6 +20,7 @@ NUM_SAMPLES = 10  # samples per dataset entry
 
 use_slerp = True
 
+use_slerp = True 
 # Models
 merge_frac = "0.7"
 base_model = "meta-llama/Llama-3.1-8B"
