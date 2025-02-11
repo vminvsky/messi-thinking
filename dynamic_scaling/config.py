@@ -13,8 +13,8 @@ class SimilarityType(Enum):
 @dataclass
 class DynamicDecodingConfig:
     # Temperature settings
-    min_temperature: float = 0.1
-    max_temperature: float = 1.5
+    min_temperature: float = 0.01
+    max_temperature: float = 1.3
     initial_temperature: float = 0.5
     
     # Decay settings

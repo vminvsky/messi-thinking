@@ -190,6 +190,8 @@ class DynamicTemperatureDecoder:
         generation_config = {
             "do_sample": True,
             "temperature": current_temperature,
+            "top_p": 0.7,
+            "top_k": 50,
             "return_dict_in_generate": True,
             "output_scores": True,
             "pad_token_id": self.tokenizer.eos_token_id,
@@ -215,6 +217,7 @@ class DynamicTemperatureDecoder:
             
             # Concatenate the new tokens to the generated tokens list
             generated_tokens.extend(new_tokens.tolist())
+                
             # Update the context_ids by appending the new tokens (unsqueeze to match dimensions)
             context_ids = torch.cat([context_ids, new_tokens.unsqueeze(0)], dim=1)
             attention_mask = torch.cat([attention_mask, torch.ones((1, new_tokens.shape[0]), dtype=torch.long, device=self.device)], dim=1)
@@ -225,7 +228,10 @@ class DynamicTemperatureDecoder:
             current_output = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
             
             if self.config.verbose_generation and len(generated_tokens) % 10 == 0:
+                
                 logger.info(f"\nGenerated text at {len(generated_tokens)} tokens:\n{current_output}\n")
+                # logger.info(f"\nNew tokens:'{self.tokenizer.decode(new_tokens, skip_special_tokens=True)}'")
+                
             
             # Check if we need to adjust temperature
             if (len(generated_tokens) >= self.config.initial_skip_tokens and 
@@ -235,6 +241,7 @@ class DynamicTemperatureDecoder:
                 similarity_history.append(similarity)
             
             # Check if generation is complete (end-of-sequence token encountered)
+            print("NEW TOKENS: ", new_tokens[-1].item(), "EOS TOKEN: ", self.tokenizer.eos_token_id)
             if new_tokens[-1].item() == self.tokenizer.eos_token_id:
                 logger.info("End of sequence token generated. Stopping generation.")
                 break
