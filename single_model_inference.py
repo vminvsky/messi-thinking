@@ -17,22 +17,23 @@ logger = logging.getLogger(__name__)
 MAX_TOKENS = 8192
 NUM_SAMPLES = 10  # samples per dataset entry
 
-
+# OUTPUT_DIR = "llama-3.1-8b"
+OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5/"
+# OUTPUT_DIR = 'taco_instruct_llama_8b_single_slerp_0.90'
 use_slerp = True
-
-use_slerp = True 
 # Models
-merge_frac = "1"
-base_model = "meta-llama/Llama-3.1-8B"
-instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
-
-use_slerp = False
+merge_frac = "0.50"
+base_model = "/scratch/gpfs/vv7118/models/hub/models--meta-llama--Llama-3.1-8B/snapshots/d04e592bb4f6aa9cfee91e2e20afa771667e1d4b"
+if use_slerp:
+    instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-{merge_frac}"
+else:
+    instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-{merge_frac}"
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
 
 
-base_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8051/v1")
+base_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
 instruct_client = AsyncOpenAI(api_key="token-abc123", base_url="http://localhost:8000/v1")
 
 def get_prompt(sample):
@@ -103,7 +104,7 @@ async def limited_process_sample(semaphore, idx, sample, sample_num, prompt, out
         await process_sample(idx, sample, sample_num, prompt, output_filename, model_flag)
 
 async def main(model_flag):
-    semaphore = asyncio.Semaphore(150)
+    semaphore = asyncio.Semaphore(200)
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
@@ -126,12 +127,5 @@ if __name__ == "__main__":
     parser.add_argument("--model", choices=["base", "instruct"], required=True, help="Select model for inference (base or instruct)")
     args = parser.parse_args()
     MODEL_FLAG = args.model
-    if MODEL_FLAG == "base":
-        OUTPUT_DIR = f"taco_base_llama_8b_single_{merge_frac}"
-    else:
-        if use_slerp:
-            OUTPUT_DIR = f"taco_instruct_llama_8b_single_slerp_{merge_frac}"
-        else:
-            OUTPUT_DIR = f"taco_instruct_llama_8b_single"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     asyncio.run(main(MODEL_FLAG)) 
