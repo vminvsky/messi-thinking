@@ -22,9 +22,11 @@ use_slerp = True
 
 use_slerp = True 
 # Models
-merge_frac = "0.7"
+merge_frac = "1"
 base_model = "meta-llama/Llama-3.1-8B"
-instruct_model = "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-0.70"
+instruct_model = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+
+use_slerp = False
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
@@ -105,7 +107,8 @@ async def main(model_flag):
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
-
+        if idx < 900:
+            continue
         prompt = get_prompt_base(sample) if model_flag == "base" else get_prompt_instruct(sample)
         if not prompt:
             continue
@@ -129,6 +132,6 @@ if __name__ == "__main__":
         if use_slerp:
             OUTPUT_DIR = f"taco_instruct_llama_8b_single_slerp_{merge_frac}"
         else:
-            OUTPUT_DIR = f"taco_instruct_llama_8b_single_{merge_frac}"
+            OUTPUT_DIR = f"taco_instruct_llama_8b_single"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     asyncio.run(main(MODEL_FLAG)) 
