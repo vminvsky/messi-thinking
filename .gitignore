@@ -5,3 +5,6 @@ scratch.py
 samples/*
 data/*
 .cache/*
+
+logs/
+__pycache__/

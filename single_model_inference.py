@@ -17,17 +17,26 @@ logger = logging.getLogger(__name__)
 MAX_TOKENS = 8192
 NUM_SAMPLES = 10  # samples per dataset entry
 
-# OUTPUT_DIR = "llama-3.1-8b"
-OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5/"
+# NOTE: CHANGE
+OUTPUT_DIR = "llama-3.1-8b"
+# OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single"
+# OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5"
+# OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5/"
 # OUTPUT_DIR = 'taco_instruct_llama_8b_single_slerp_0.90'
+
+# NOTE: CHANGE
 use_slerp = True
 # Models
 merge_frac = "0.50"
 base_model = "/scratch/gpfs/vv7118/models/hub/models--meta-llama--Llama-3.1-8B/snapshots/d04e592bb4f6aa9cfee91e2e20afa771667e1d4b"
+
 if use_slerp:
     instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-slerp-{merge_frac}"
 else:
     instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-{merge_frac}"
+
+# instruct_model = 
+# instruct_model = "/scratch/gpfs/vv7118/models/hub/models--deepseek-ai--DeepSeek-R1-Distill-Llama-8B/snapshots/ebf7e8d03db3d86a442d22d30d499abb7ec27bea"
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
@@ -108,6 +117,8 @@ async def main(model_flag):
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
+        if idx > 1000:
+            break
 
         prompt = get_prompt_base(sample) if model_flag == "base" else get_prompt_instruct(sample)
         if not prompt:

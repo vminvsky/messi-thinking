@@ -97,7 +97,7 @@ if __name__ == "__main__":
     filtered_file_paths = []
     for file_path in file_paths:
         question_num = extract_question_num(file_path)
-        if question_num is not None and int(question_num) < 500:
+        if question_num is not None:
             filtered_file_paths.append(file_path)
     
     file_paths = filtered_file_paths
