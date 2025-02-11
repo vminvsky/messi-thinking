@@ -1,24 +1,41 @@
 import argparse
 import json
 import os
+import random
 from tqdm import tqdm
-
+import re
 def main():
     parser = argparse.ArgumentParser(description="Convert JSON data for processing.")
     parser.add_argument(
         "--input_dir", type=str, help="Directory containing input JSON files."
     )
     parser.add_argument("--output", type=str, help="Output JSON file.")
+    parser.add_argument("--max_samples", type=int, default=0, help="Maximum number of correct samples per question (0 for no limit)")
     args = parser.parse_args()
 
-    all_data = []
-
-    # Iterate through all files in the input directory
+    data_by_question = {}
     for filename in tqdm(os.listdir(args.input_dir), desc="Processing files"):
         if filename.endswith(".json") and filename.startswith("converted_"):
+            regex = re.compile(r"converted_question_(?P<question_id>\d+)_sample_(?P<sample_id>\d+)(?P<suffix>.*)\.json")
+            match = regex.match(filename)
+            question_id = int(match.group("question_id"))
+            sample_id = int(match.group("sample_id"))
+            suffix = match.group("suffix")
+            
+            if suffix == "_wrong_model":
+                continue
+        
+
             # skip questions with id 500 or higher
-            if int(filename.split("_")[2]) >= 500:
-                print(f"Skipping {filename} because it has id {filename.split('_')[1]}")
+            
+            if question_id >= 1000:
+                print(f"Skipping {filename} because it has id {question_id}")
+                continue
+
+            # skip samples 10 or higher
+            
+            if sample_id >= 10:
+                print(f"Skipping {filename} because it has sample {sample_id}")
                 continue
             
             filepath = os.path.join(args.input_dir, filename)
@@ -42,7 +59,18 @@ def main():
                     "system": system_prompt,
                     "conversations": conversations,
                 }
-                all_data.append(cur_data)
+                if question_id not in data_by_question:
+                    data_by_question[question_id] = []
+                data_by_question[question_id].append(cur_data)
+
+    all_data = []
+    # Randomly select up to k correct samples per question
+    for samples in data_by_question.values():
+        if args.max_samples > 0 and len(samples) > args.max_samples:
+            selected = random.sample(samples, args.max_samples)
+        else:
+            selected = samples
+        all_data.extend(selected)
 
     # Save the converted data to the output file
     with open(args.output, "w") as f:
