@@ -18,7 +18,7 @@ MAX_TOKENS = 8192
 NUM_SAMPLES = 10  # samples per dataset entry
 
 # OUTPUT_DIR = "llama-3.1-8b"
-OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5/"
+OUTPUT_DIR = "taco_instruct_llama_8b_single_slerp_0.5/"
 # OUTPUT_DIR = 'taco_instruct_llama_8b_single_slerp_0.90'
 use_slerp = True
 # Models
@@ -103,12 +103,13 @@ async def limited_process_sample(semaphore, idx, sample, sample_num, prompt, out
     async with semaphore:
         await process_sample(idx, sample, sample_num, prompt, output_filename, model_flag)
 
-async def main(model_flag):
+async def main(model_flag, begin_idx):
     semaphore = asyncio.Semaphore(200)
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
-        if idx < 900:
+        if idx < begin_idx:
+            logger.info(f"Skipping sample {idx} because it is less than begin_idx {begin_idx}")
             continue
         prompt = get_prompt_base(sample) if model_flag == "base" else get_prompt_instruct(sample)
         if not prompt:
@@ -125,7 +126,39 @@ async def main(model_flag):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", choices=["base", "instruct"], required=True, help="Select model for inference (base or instruct)")
+    parser.add_argument("--instruct_model", required=True, help="Path to instruct model")
+    parser.add_argument("--max_tokens", type=int, default=8192, help="Maximum tokens for generation")
+    parser.add_argument("--num_samples", type=int, default=10, help="Number of samples per dataset entry")
+    parser.add_argument("--output_dir", required=True, help="Output directory for generated files")
+    parser.add_argument("--use_slerp", dest="use_slerp", action="store_true", help="Enable slerp (default)")
+    parser.add_argument("--no_slerp", dest="use_slerp", action="store_false", help="Disable slerp")
+    parser.set_defaults(use_slerp=True)
+    parser.add_argument("--begin_idx", type=int, default=0, help="Begin index for processing samples")
+    parser.add_argument("--merge_frac", default="0.50", help="Merge fraction for instruct model")
+    parser.add_argument("--base_model", default="models/hub/models--meta-llama--Llama-3.1-8B/snapshots/d04e592bb4f6aa9cfee91e2e20afa771667e1d4b", help="Path to base model")
+    parser.add_argument("--openai_api_key", default="token-abc123", help="API key for OpenAI client")
+    parser.add_argument("--openai_base_url", default="http://localhost:8000/v1", help="Base URL for OpenAI API")
+    parser.add_argument("--base_temperature", type=float, default=0.8, help="Temperature for base model")
+    parser.add_argument("--base_top_p", type=float, default=0.95, help="Top-p for base model")
+    parser.add_argument("--instruct_temperature", type=float, default=0.7, help="Temperature for instruct model")
+    parser.add_argument("--instruct_top_p", type=float, default=0.7, help="Top-p for instruct model")
     args = parser.parse_args()
-    MODEL_FLAG = args.model
+
+    MAX_TOKENS = args.max_tokens
+    NUM_SAMPLES = args.num_samples
+    OUTPUT_DIR = args.output_dir
+    use_slerp = args.use_slerp
+    merge_frac = args.merge_frac
+    base_model = args.base_model
+    instruct_model = args.instruct_model
+    base_temperature = args.base_temperature
+    base_top_p = args.base_top_p
+    instruct_temperature = args.instruct_temperature
+    instruct_top_p = args.instruct_top_p
+
+    
+    base_client = AsyncOpenAI(api_key=args.openai_api_key, base_url=args.openai_base_url)
+    instruct_client = AsyncOpenAI(api_key=args.openai_api_key, base_url=args.openai_base_url)
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    asyncio.run(main(MODEL_FLAG)) 
+    asyncio.run(main(args.model, args.begin_idx)) 
