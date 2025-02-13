@@ -18,11 +18,14 @@ MAX_TOKENS = 8192
 NUM_SAMPLES = 10  # samples per dataset entry
 
 # NOTE: CHANGE
-OUTPUT_DIR = "llama-3.1-8b"
-# OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single"
+# OUTPUT_DIR = "llama-3.1-8b"
+OUTPUT_DIR = "llama-3.1-8b-mixed-0.70/"
 # OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5"
 # OUTPUT_DIR = "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5/"
 # OUTPUT_DIR = 'taco_instruct_llama_8b_single_slerp_0.90'
+# OUTPUT_DIR = 
+
+TEMPERATURE = 1.2 
 
 # NOTE: CHANGE
 use_slerp = True
@@ -36,7 +39,7 @@ else:
     instruct_model = f"/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-{merge_frac}"
 
 # instruct_model = 
-# instruct_model = "/scratch/gpfs/vv7118/models/hub/models--deepseek-ai--DeepSeek-R1-Distill-Llama-8B/snapshots/ebf7e8d03db3d86a442d22d30d499abb7ec27bea"
+instruct_model = "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-0.70/"
 
 # Use async inference with OpenAI client
 USE_OPENAI = True
@@ -95,11 +98,11 @@ async def process_sample(idx, sample, sample_num, prompt, output_filename, model
         "generation_config": {
             "base_model": base_model,
             "instruct_model": instruct_model,
-            "base_temperature": 0.8,
+            "base_temperature": TEMPERATURE,
             "base_top_p": 0.95,
             "base_top_k": 0,
             "base_max_tokens": MAX_TOKENS,
-            "instruct_temperature": 0.7,
+            "instruct_temperature": TEMPERATURE,
             "instruct_top_p": 0.7,
             "instruct_top_k": 0,
             "instruct_max_tokens": MAX_TOKENS

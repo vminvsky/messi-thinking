@@ -51,9 +51,11 @@ def process_file(file_path, api_key_cycle):
     if "converted_" in file_path:
         print(f"Skipping {file_path} because it is already converted")
         return file_path, file_path
-    if "converted_" + os.path.basename(file_path) in os.listdir(os.path.dirname(file_path)):
+    elif "converted_" + os.path.basename(file_path) in os.listdir(os.path.dirname(file_path)):
         print(f"Skipping {file_path} because it is already converted")
         return file_path, file_path
+    else:
+        print(f"Processing {file_path}")
     with open(file_path, "r") as f:
         data = json.load(f)
     correctness = data.get("correctness", None)
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     filtered_file_paths = []
     for file_path in file_paths:
         question_num = extract_question_num(file_path)
-        if question_num is not None:
+        if question_num is not None and int(question_num) < 1000:
             filtered_file_paths.append(file_path)
     
     file_paths = filtered_file_paths
@@ -107,4 +109,4 @@ if __name__ == "__main__":
         tasks = [(file_path, api_key_cycle) for file_path in file_paths]
         for result in tqdm(pool.imap(process_file_wrapper, tasks), total=len(file_paths)):
             results.append(result)
-            print(f"Processed {result[0]} -> {result[1]}")
+            

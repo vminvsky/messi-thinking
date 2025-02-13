@@ -2,7 +2,7 @@ import os
 import json
 from datasets import load_dataset
 from tqdm import tqdm
-from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED, BASE_MODEL_SYSTEM_PROMPT, QWEN_BASE_MODEL_PROMPT
+from dynamic_scaling.prompt import SKY_T1_SYSTEM_PROMPT, SKY_T1_FIXED, BASE_MODEL_SYSTEM_PROMPT
 from together import Together
 from openai import AsyncOpenAI
 import logging

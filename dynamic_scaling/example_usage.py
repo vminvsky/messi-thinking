@@ -53,7 +53,7 @@ print("\nGenerating with updated reference thoughts:")
 prompt = ds[0]["question"]
 
 print("input prompt: ", prompt)
-result = decoder.generate(system_prompt=REASONING_SYSTEM_PROMPT, prompt=prompt, max_new_tokens=1024)
+result = decoder.generate(system_prompt=REASONING_SYSTEM_PROMPT, prompt=prompt, max_length=4096, max_new_tokens=16384)
 print(result["generated_text"])
 
 print("\nTemperature History:", result["temperature_history"])
