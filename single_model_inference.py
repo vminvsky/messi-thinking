@@ -104,7 +104,7 @@ async def limited_process_sample(semaphore, idx, sample, sample_num, prompt, out
         await process_sample(idx, sample, sample_num, prompt, output_filename, model_flag)
 
 async def main(model_flag, begin_idx):
-    semaphore = asyncio.Semaphore(200)
+    semaphore = asyncio.Semaphore(100)
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
