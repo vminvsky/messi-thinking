@@ -10,6 +10,7 @@ dependencies = [
     "einops>=0.8.0",
     "matplotlib>=3.10.0",
     "numpy>=2.2.2",
+    "openai>=1.63.0",
     "scikit-learn>=1.6.1",
     "seaborn>=0.13.2",
     "tiktoken>=0.8.0",
@@ -17,4 +18,6 @@ dependencies = [
     "tqdm>=4.67.1",
     "transformers==4.48.2",
     "transformers-stream-generator>=0.0.5",
+    "vastai>=0.2.8",
+    "vllm>=0.2.5",
 ]

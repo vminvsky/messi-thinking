@@ -50,3 +50,6 @@ single_inference.sh
 
 logs/
 __pycache__/
+curator/*
+*.pyc
+single_inference.sh
