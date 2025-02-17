@@ -39,7 +39,9 @@ def main():
     directories = [
         "SkyThought/samples/taco-ll3-8B-llama-8b-big-lora-256-epochs-2-merged",
         "SkyThought/samples/taco-ll3-8B-llama-8b-slerp-0.7-big-lora-256-epochs-2-merged",
-        "SkyThought/samples/taco-ll3-8B-llama-8b-big-slerp-0.5-lora-256-epochs-2-merged"
+        "SkyThought/samples/taco-ll3-8B-llama-8b-big-slerp-0.5-lora-256-epochs-2-merged",
+        "SkyThought/samples/taco-ll3-8B-llama-8b-big-0.0-lora-256-epochs-2-merged",
+        "SkyThought/samples/Meta-Llama-3.1-8B-Instruct-Turbo"
     ]
 
     k_values = list(range(1, 11))
@@ -48,7 +50,9 @@ def main():
     names = {
         "SkyThought/samples/taco-ll3-8B-llama-8b-big-lora-256-epochs-2-merged": r"$\alpha=1$",
         "SkyThought/samples/taco-ll3-8B-llama-8b-slerp-0.7-big-lora-256-epochs-2-merged": r"$\alpha=0.7$",
-        "SkyThought/samples/taco-ll3-8B-llama-8b-big-slerp-0.5-lora-256-epochs-2-merged": r"$\alpha=0.5$"
+        "SkyThought/samples/taco-ll3-8B-llama-8b-big-slerp-0.5-lora-256-epochs-2-merged": r"$\alpha=0.5$",
+        "SkyThought/samples/taco-ll3-8B-llama-8b-big-0.0-lora-256-epochs-2-merged": r"$\alpha=0.0$",
+        "SkyThought/samples/Meta-Llama-3.1-8B-Instruct-Turbo": r"$\alpha=0.2$",
     }
     
     for directory in directories:
