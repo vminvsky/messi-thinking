@@ -51,3 +51,9 @@ base_instruct_generation/__pycache__/model_utils.cpython-311.pyc
 slurm-*
 curator/**
 taco_instruct_llama_8b_single_incomplete/**
+
+logs/
+__pycache__/
+curator/*
+*.pyc
+single_inference.sh
