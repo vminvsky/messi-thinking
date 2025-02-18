@@ -47,3 +47,7 @@ similarity_distribution_local.png
 similarity_distribution.png
 pass_at_k.png
 single_inference.sh
+base_instruct_generation/__pycache__/model_utils.cpython-311.pyc
+slurm-*
+curator/**
+taco_instruct_llama_8b_single_incomplete/**

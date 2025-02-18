@@ -4,6 +4,15 @@ import os
 import random
 from tqdm import tqdm
 import re
+from dynamic_scaling.prompt import SKY_T1_FIXED, BASE_MODEL_SYSTEM_PROMPT, generate_prompt
+
+def get_prompt(sample):
+    """Parse test cases and starter code from problem to create a prompt for the LLM."""
+    test_case = json.loads(sample["input_output"])
+    starter_code = sample["starter_code"]
+    prompt_text = generate_prompt(test_case, sample["question"], starter_code)
+    return [{"role": "system", "content": SKY_T1_FIXED}, {"role": "user", "content": prompt_text}]
+
 def main():
     parser = argparse.ArgumentParser(description="Convert JSON data for processing.")
     parser.add_argument(
@@ -11,8 +20,9 @@ def main():
     )
     parser.add_argument("--output", type=str, help="Output JSON file.")
     parser.add_argument("--max_samples", type=int, default=0, help="Maximum number of correct samples per question (0 for no limit)")
+    parser.add_argument("--base", action="store_true", help="Use base model")
     args = parser.parse_args()
-
+    
     data_by_question = {}
     for filename in tqdm(os.listdir(args.input_dir), desc="Processing files"):
         if filename.endswith(".json") and filename.startswith("converted_"):
@@ -28,9 +38,9 @@ def main():
 
             # skip questions with id 500 or higher
             
-            if question_id >= 1000:
-                print(f"Skipping {filename} because it has id {question_id}")
-                continue
+            # if question_id >= 1000:
+            #     print(f"Skipping {filename} because it has id {question_id}")
+            #     continue
 
             # skip samples 10 or higher
             
@@ -42,8 +52,12 @@ def main():
             with open(filepath, "r") as f:
                 sample = json.load(f)
 
-            system_prompt = sample["prompt"][0]["content"]
-            user_prompt = sample["prompt"][1]["content"]
+            if args.base:
+                system_prompt = "Your role as an assistant involves thoroughly exploring questions through a systematic long thinking process before providing the final precise and accurate solutions. This requires engaging in a comprehensive cycle of analysis, summarizing, exploration, reassessment, reflection, backtracing, and iteration to develop well-considered thinking process. Please structure your response into two main sections: Thought and Solution. In the Thought section, detail your reasoning process using the specified format: [begin_of_thought] {thought with steps separated with '\\n\\n'} [end_of_thought] Each step should include detailed considerations such as analisying questions, summarizing relevant findings, brainstorming new ideas, verifying the accuracy of the current steps, refining any errors, and revisiting previous steps. In the Solution section, based on various attempts, explorations, and reflections from the Thought section, systematically present the final solution that you deem correct. The solution should remain a logical, accurate, concise expression style and detail necessary step needed to reach the conclusion, formatted as follows: [begin_of_solution] {final formatted, precise, and clear solution} [end_of_solution] Now, try to solve the following question through the above guidelines:"
+                user_prompt = get_prompt(sample['metadata'])[1]["content"]
+            else:
+                system_prompt = sample["prompt"][0]["content"]
+                user_prompt = sample["prompt"][1]["content"]
             assistant_response = sample["converted_text"]
 
             # Accept this data

@@ -56,8 +56,12 @@ def process_file(file_path, api_key_cycle):
         return file_path, file_path
     else:
         print(f"Processing {file_path}")
-    with open(file_path, "r") as f:
-        data = json.load(f)
+    try:
+        with open(file_path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"Error loading {file_path}: {e}")
+        raise e
     correctness = data.get("correctness", None)
     print(f"Processing {file_path} with correctness {correctness}")
     # if correctness is None:
@@ -99,8 +103,8 @@ if __name__ == "__main__":
     filtered_file_paths = []
     for file_path in file_paths:
         question_num = extract_question_num(file_path)
-        if question_num is not None and int(question_num) < 1000:
-            filtered_file_paths.append(file_path)
+        # if question_num is not None and int(question_num) < 1000:
+        filtered_file_paths.append(file_path)
     
     file_paths = filtered_file_paths
     

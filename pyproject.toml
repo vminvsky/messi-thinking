@@ -17,4 +17,5 @@ dependencies = [
     "tqdm>=4.67.1",
     "transformers==4.48.2",
     "transformers-stream-generator>=0.0.5",
+    "vastai>=0.2.8",
 ]
