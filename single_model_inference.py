@@ -115,9 +115,7 @@ async def main(model_flag, begin_idx):
     tasks = []
     ds = load_dataset("BAAI/TACO", trust_remote_code=True)["train"].filter(lambda x: x["difficulty"] == "MEDIUM")
     for idx, sample in tqdm(enumerate(ds), desc="Processing samples"):
-        if idx > 1000:
-            break
-
+        prompt = get_prompt_base(sample) if model_flag == "base" else get_prompt_instruct(sample)
         if idx < begin_idx:
             continue
         for sample_num in range(NUM_SAMPLES):
