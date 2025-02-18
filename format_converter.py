@@ -5,7 +5,7 @@ import os
 import time
 from itertools import cycle
 
-import openai
+from openai import AzureOpenAI
 from tqdm import tqdm
 
 from dotenv import load_dotenv
@@ -14,17 +14,18 @@ from dynamic_scaling.prompt import convert_prompt, convert_prompt_example
 
 load_dotenv()
 
-def set_openai_key(api_key):
-    openai.api_key = api_key
-
+client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    azure_endpoint="https://api-ai-sandbox.princeton.edu/",
+    api_version="2024-02-01"
+)
 
 def process_content(content, api_key):
-    set_openai_key(api_key)
     prompt = convert_prompt.format(example=convert_prompt_example, content=content)
     retries = 3
     while retries > 0:
         try:
-            response = openai.chat.completions.create(
+            response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {
@@ -37,7 +38,8 @@ def process_content(content, api_key):
                 temperature=0.7,
             )
             return response.choices[0].message.content
-        except openai.RateLimitError:
+        except Exception as e:
+            print(f"Error processing content: {e}. Retrying...")
             retries -= 1
             if retries == 0:
                 return "Error: Rate limit reached and retries exhausted."
@@ -79,7 +81,6 @@ def process_file(file_path, api_key_cycle):
         json.dump(data, f, indent=4)
     return file_path, output_file
 
-
 def process_file_wrapper(args):
     return process_file(*args)
 
@@ -90,7 +91,6 @@ def extract_question_num(file_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process sample files from switching_inference output and convert their format.")
     parser.add_argument("--input_dir", type=str, help="Input directory containing sample JSON files.")
-    # parser.add_argument("--keys", type=str, help="File containing OpenAI API keys (one per line).")
     args = parser.parse_args()
     
     api_keys = [os.getenv("OPENAI_API_KEY")]
@@ -99,7 +99,6 @@ if __name__ == "__main__":
 
     file_paths = [os.path.join(args.input_dir, filename) for filename in os.listdir(args.input_dir) if filename.endswith(".json")]
 
-    # Filter file_paths based on question numbers < 500
     filtered_file_paths = []
     for file_path in file_paths:
         question_num = extract_question_num(file_path)
