@@ -1,0 +1,9 @@
+{
+    "llama-3.1-8b": "/scratch/gpfs/vv7118/models/hub/models--meta-llama--Llama-3.1-8B/snapshots/d04e592bb4f6aa9cfee91e2e20afa771667e1d4b",
+    "llama-3.1-8b-instruct": "/scratch/gpfs/vv7118/models/hub/models--meta-llama--Meta-Llama-3.1-8B-Instruct/snapshots/5206a32e0bd3067aef1ce90f5528ade7d866253f",
+    "qwen2.5-32b": "/scratch/gpfs/vv7118/models/hub/models--Qwen--Qwen2.5-32B/snapshots/1818d35814b8319459f4bd55ed1ac8709630f003",
+    "s1":"/scratch/gpfs/vv7118/models/hub/models--simplescaling--s1.1-32B/snapshots/4d6d573e59b7fafae141a124cdd3f541e5aa967a",
+    "llama-3.1-8b-alpha-0.7": "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-0.7",
+    "llama-3.1-8b-alpha-0.9": "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-0.9",
+    "llama-3.1-8b-alpha-0.5": "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-0.5"
+}
