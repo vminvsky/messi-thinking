@@ -7,5 +7,7 @@
     "llama-3.1-8b-alpha-0.9": "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-0.90",
     "llama-3.1-8b-alpha-0.5": "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-mixed-0.50",
     "s1-0.7": "/scratch/gpfs/vv7118/models/mixed_models/qwen2.5-0.7",
-    "s1-0.9": "/scratch/gpfs/vv7118/models/mixed_models/qwen2.5-0.9"
+    "s1-0.9": "/scratch/gpfs/vv7118/models/mixed_models/qwen2.5-0.9",
+    "r1-llama-8b-0.7": "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-0.7",
+    "r1-llama-8b-0.9": "/scratch/gpfs/vv7118/models/mixed_models/llama-3.1-8b-0.9"
 }
