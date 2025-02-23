@@ -1,3 +1,4 @@
+import random
 import os
 import json
 from openai import OpenAI
@@ -9,6 +10,8 @@ from dotenv import load_dotenv
 import tiktoken
 
 load_dotenv()
+
+random.seed(42)
 
 def truncate_text(text, max_tokens=8000):
     encoding = tiktoken.get_encoding("cl100k_base")
@@ -22,7 +25,7 @@ def truncate_text(text, max_tokens=8000):
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def embed_text(text: str, dimensions: int = 150) -> List[float]:
+def embed_text(text: str, dimensions: int = 1024) -> List[float]:
     """
     Generate embeddings for a given text using OpenAI's API.
     
@@ -44,7 +47,7 @@ def embed_text(text: str, dimensions: int = 150) -> List[float]:
         print(f"Error generating embedding: {e}")
         return None
 
-def process_file(file_path: str, output_dir: str) -> Dict:
+def process_file(file_path: str, output_dir: str, max_tokens: int = None, overwrite: bool = False) -> Dict:
     """
     Process a single JSON file and generate embeddings for both text fields.
     Only process files with 'converted' prefix and add missing embeddings.
@@ -61,15 +64,21 @@ def process_file(file_path: str, output_dir: str) -> Dict:
         return None
     
     question_num = int(file_path.split('question_')[1].split('_')[0])
-    if question_num > 499:
-        return None 
+    # if question_num > 999:
+    #     pass 
     
     try:
         # Check if output file exists and load it
-        output_path = os.path.join(
-            output_dir,
-            os.path.basename(file_path).replace('.json', '_with_embeddings.json')
-        )
+        if max_tokens:
+            output_path = os.path.join(
+                output_dir,
+                os.path.basename(file_path).replace('.json', f'_with_embeddings.json')
+            )
+        else:
+            output_path = os.path.join(
+                output_dir,
+                os.path.basename(file_path).replace('.json', '_with_embeddings.json')
+            )
         
         data = None
         if os.path.exists(output_path):
@@ -85,13 +94,13 @@ def process_file(file_path: str, output_dir: str) -> Dict:
             return None
             
         # Generate missing embeddings
-        if 'generated_embedding' not in data:
-            generated_embedding = embed_text(truncate_text(data['generated_text']))
+        if ('generated_embedding' not in data) or overwrite:
+            generated_embedding = embed_text(truncate_text(data['generated_text'], max_tokens))
             if generated_embedding:
                 data['generated_embedding'] = generated_embedding
             
-        if 'converted_text' in data and 'converted_embedding' not in data:
-            converted_embedding = embed_text(truncate_text(data['converted_text']))
+        if ('converted_text' in data) and ('converted_embedding' not in data) or overwrite:
+            converted_embedding = embed_text(truncate_text(data['converted_text'], max_tokens))
             if converted_embedding:
                 data['converted_embedding'] = converted_embedding
         
@@ -101,7 +110,7 @@ def process_file(file_path: str, output_dir: str) -> Dict:
         print(f"Error processing file {file_path}: {e}")
         return None
 
-def process_directory(input_dir: str, output_dir: str, max_workers: int = 4):
+def process_directory(input_dir: str, output_dir: str, max_workers: int = 4, max_tokens: int = None, sample_size: int = None, overwrite: bool = False):
     """
     Process all JSON files in a directory in parallel.
     
@@ -114,7 +123,13 @@ def process_directory(input_dir: str, output_dir: str, max_workers: int = 4):
     os.makedirs(output_dir, exist_ok=True)
     
     # Get all JSON files in the input directory
-    json_files = glob.glob(os.path.join(input_dir, "*.json"))
+    question_nums = [int(os.path.basename(file_path).split('question_')[1].split('_')[0]) for file_path in glob.glob(os.path.join(input_dir, "*.json"))]
+    sample_question_nums = random.sample(list(set(question_nums)), sample_size) if sample_size else question_nums
+    if sample_size:
+        json_files = [f for f in glob.glob(os.path.join(input_dir, "*.json")) if int(os.path.basename(f).split('question_')[1].split('_')[0]) in sample_question_nums]
+    else:
+        json_files = glob.glob(os.path.join(input_dir, "*.json"))
+    print(json_files)
     
     if not json_files:
         print(f"No JSON files found in {input_dir}")
@@ -126,7 +141,7 @@ def process_directory(input_dir: str, output_dir: str, max_workers: int = 4):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Use tqdm for progress bar
         results = list(tqdm(
-            executor.map(lambda x: process_file(x, output_dir), json_files),
+            executor.map(lambda x: process_file(x, output_dir, max_tokens, overwrite), json_files),
             total=len(json_files),
             desc="Generating embeddings"
         ))
@@ -135,10 +150,16 @@ def process_directory(input_dir: str, output_dir: str, max_workers: int = 4):
     processed_count = 0
     for file_path, result in zip(json_files, results):
         if result:
-            output_path = os.path.join(
-                output_dir,
-                os.path.basename(file_path).replace('.json', '_with_embeddings.json')
-            )
+            if max_tokens:
+                output_path = os.path.join(
+                    output_dir,
+                    os.path.basename(file_path).replace('.json', f'_with_embeddings.json')
+                )
+            else:
+                output_path = os.path.join(
+                    output_dir,
+                    os.path.basename(file_path).replace('.json', '_with_embeddings.json')
+                )
             with open(output_path, 'w') as f:
                 json.dump(result, f, indent=2)
             processed_count += 1
@@ -146,15 +167,26 @@ def process_directory(input_dir: str, output_dir: str, max_workers: int = 4):
     print(f"Processed {processed_count} files with new or updated embeddings.")
 
 if __name__ == "__main__":
-    # Example usage
-    run_name = "taco_instruct_llama_8b_single_slerp_0.5/"
-    input_directory = f"/scratch/gpfs/bs6865/messi-thinking/{run_name}"
-    # input_directory = f"/scratch/gpfs/vv7118/projects/messi-thinking/{run_name}"
-    output_directory = f"embeddings/{run_name}"
-    os.makedirs(output_directory, exist_ok=True)
-    
-    process_directory(
-        input_directory,
-        output_directory,
-        max_workers=10  # Adjust based on your needs
-    )
+    max_tokens = 500
+    sample_size = 500
+    overwrite = True
+    dirs = [
+        "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.7",
+        "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single",
+        "/scratch/gpfs/vv7118/projects/messi-thinking/llama-3.1-8b",
+        # "/scratch/gpfs/bs6865/messi-thinking/taco_instruct_llama_8b_single_slerp_0.5",
+    ]
+
+    for dir in dirs:
+        input_directory = dir
+        output_directory = f"embeddings/{dir.split('/')[-1]}/max_tokens_{max_tokens}"
+        os.makedirs(output_directory, exist_ok=True)
+        
+        process_directory(
+            input_directory,
+            output_directory,
+            max_workers=10,
+            max_tokens=max_tokens,
+            sample_size=sample_size,
+            overwrite=overwrite
+        )

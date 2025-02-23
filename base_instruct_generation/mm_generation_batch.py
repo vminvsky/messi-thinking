@@ -4,6 +4,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import logging
 from typing import List, Union, Dict
 import torch 
+import time  # Add this import
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -20,8 +21,8 @@ def continue_generation_prompt(prompt: str):
     # replace the final occurance of <|im_end|>\n<|im_start|>assistant\n 
     # Find the last occurrence and only replace that one
     # last_idx = prompt.rindex("<|im_end|>\n<|im_start|>assistant\n")
-    last_idx = prompt.rindex("<｜end▁of▁sentence｜><｜Assistant｜>")
-    text = prompt[:last_idx] + prompt[last_idx:].replace("<｜end▁of▁sentence｜><｜Assistant｜>", "", 1)
+    last_idx = prompt.rindex("<｜Assistant｜>")
+    text = prompt[:last_idx] + prompt[last_idx:].replace("<｜Assistant｜>", "", 1)
     return text
 
 @dataclass
@@ -58,7 +59,10 @@ class MessiModels:
         generate_solo: if True, we only generate base, if false we generate both base and it
         Returns a string for a single prompt or a list of strings for batched prompts.
         """
+        start_time = time.time()
         self.base_tokenizer.pad_token = self.base_tokenizer.eos_token
+        self.base_tokenizer.padding_side = "left"
+        self.base_model.eval()
         # If a single string was passed, wrap it in a list.
         single_prompt = False
         if isinstance(prompt, str):
@@ -68,7 +72,7 @@ class MessiModels:
         if generate_solo:
             prompt2 = deepcopy([self.system_prompt + ' ' + p + ' ' + self.base_suffix for p in prompt])
         else:
-            prompt2 = deepcopy(prompt)
+            prompt2 = prompt
 
         self.logger.debug(f"Generating from base model for batch size {len(prompt)} with max tokens: {max_tokens}")
         
@@ -79,14 +83,17 @@ class MessiModels:
         len_base_output = base_input_ids.shape[1]
 
         # Generate new tokens
-        base_output = self.base_model.generate(
-            base_input_ids,
-            attention_mask=base_inputs.attention_mask,
-            max_new_tokens=max_tokens,
-            temperature=self.temperature,
-            do_sample=True,
-            pad_token_id=self.base_tokenizer.eos_token_id
-        )
+        with torch.no_grad():   
+            generation_start = time.time()
+            base_output = self.base_model.generate(
+                base_input_ids,
+                attention_mask=base_inputs.attention_mask,
+                max_new_tokens=max_tokens,
+                temperature=self.temperature,
+                do_sample=True,
+                pad_token_id=self.base_tokenizer.eos_token_id
+            )
+            generation_time = time.time() - generation_start
 
         # Determine where actual content starts (for left padding)
         if "attention_mask" in base_inputs:
@@ -110,6 +117,8 @@ class MessiModels:
             #     print(out_string)
             results.append((out_string, generated_token_count, out_tokens))
 
+        total_time = time.time() - start_time
+        self.logger.info(f"Base model generation completed in {total_time:.2f}s (generation: {generation_time:.2f}s)")
         return results[0] if single_prompt else results
     
 
@@ -119,7 +128,11 @@ class MessiModels:
         generate_solo: if True, we only generate it, if false we generate both base and it
         It applies a chat template to each prompt and then decodes the newly generated tokens.
         """
+        start_time = time.time()
         self.it_tokenizer.pad_token = self.it_tokenizer.eos_token
+        self.it_tokenizer.padding_side = "left"  # Changed from "right" to "left"
+
+        self.it_model.eval()
         single_prompt = False
         if isinstance(prompt, str):
             prompt = [prompt]
@@ -150,14 +163,17 @@ class MessiModels:
         tokens = self.it_tokenizer(tokenized_prompts, return_tensors="pt", padding=True) #.to(self.device)
         
         # Generate new tokens.
-        it_output = self.it_model.generate(
-            tokens.input_ids,
-            max_new_tokens=max_tokens,
-            attention_mask=tokens.attention_mask,
-            temperature=self.temperature,
-            do_sample=True,
-            pad_token_id=self.it_tokenizer.eos_token_id
-        )
+        with torch.no_grad():
+            generation_start = time.time()
+            it_output = self.it_model.generate(
+                tokens.input_ids,
+                max_new_tokens=max_tokens,
+                attention_mask=tokens.attention_mask,
+                temperature=self.temperature,
+                do_sample=True,
+                pad_token_id=self.it_tokenizer.eos_token_id
+            )
+            generation_time = time.time() - generation_start
 
         # Determine where actual content starts (for left padding)
         if "attention_mask" in tokens:
@@ -179,6 +195,8 @@ class MessiModels:
                 print(out_string)
             results.append((out_string, generated_token_count, out_tokens))
 
+        total_time = time.time() - start_time
+        self.logger.info(f"IT model generation completed in {total_time:.2f}s (generation: {generation_time:.2f}s)")
         return results[0] if single_prompt else results
 
     def generate_from_both(
@@ -192,6 +210,7 @@ class MessiModels:
         Alternates generation between the IT and base models until a total of max_tokens_total
         (per prompt) have been generated. Uses batched inference for efficiency.
         """
+        start_time = time.time()
         # Ensure prompt is a list.
         if isinstance(prompt, str):
             prompt = [prompt]
@@ -218,6 +237,7 @@ class MessiModels:
                 max_tokens = [min(max_it_tokens, max_tokens_total - generated_tokens[i]) for i in indices]
                 self.logger.debug(f"IT generation step for indices {indices} with max tokens: {max_tokens}")
                 
+                it_start = time.time()
                 # Batch process all prompts at once
                 it_results = self.generate_from_it(current_prompts, 
                                                    current_templates, max_tokens=max(max_tokens), generate_solo=False)
@@ -228,6 +248,7 @@ class MessiModels:
                     base_prompts[idx] += out_string
                     LLM_source[idx] += out_tokens
                     generated_tokens[idx] += token_count
+                self.logger.debug(f"IT step completed in {time.time() - it_start:.2f}s")
 
             if all(gt >= max_tokens_total for gt in generated_tokens):
                 break
@@ -239,6 +260,7 @@ class MessiModels:
                 # Calculate max tokens for each prompt individually
                 max_tokens = [min(max_base_tokens, max_tokens_total - generated_tokens[i]) for i in indices]
                 self.logger.debug(f"Base generation step for indices {indices} with max tokens: {max_tokens}")
+                base_start = time.time()
                 # Batch process all prompts at once
                 base_results = self.generate_from_base(current_prompts, max_tokens=max(max_tokens), generate_solo=False)
                 # Update results for each prompt
@@ -248,8 +270,10 @@ class MessiModels:
                     base_prompts[idx] += out_string
                     LLM_source[idx] += out_tokens
                     generated_tokens[idx] += token_count
+                self.logger.debug(f"Base step completed in {time.time() - base_start:.2f}s")
 
-        # self.logger.info(f"Completed alternating generation for batch. Generated tokens per prompt: {generated_tokens}")
+        total_time = time.time() - start_time
+        self.logger.info(f"Alternating generation completed in {total_time:.2f}s")
         # Return a single tuple if only one prompt was processed; otherwise return lists.
         return (prompts, LLM_source) if batch_size == 1 else (prompts, LLM_source)
 
@@ -285,7 +309,15 @@ if __name__ == "__main__":
     # Batched examples with multiple prompts
     prompts = [
         "Write me a hundred word story about a cat.",
-        # "Write me a hundred word story about a dog."
+        "Write me a hundred word story about a dog.",
+        "Write me a hundred word story about a horse.",
+        "Write me a hundred word story about a bird.",
+        "Write me a hundred word story about a fish.",
+        "Write me a hundred word story about a snake.",
+        "Write me a hundred word story about a rabbit.",
+        "Write me a hundred word story about a tiger.",
+        "Write me a hundred word story about a lion.",
+        "Write me a hundred word story about a bear.",
     ]
     both_stories = mmg.generate_from_both(prompts, max_tokens_total=1000)
     # base_stories = mmg.generate_from_base(prompts, max_tokens=100)

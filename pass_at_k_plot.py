@@ -21,7 +21,7 @@ def calculate_pass_rates(directory):
         with open(file, "r") as f:
             data = json.load(f)
         qid = data["task_id"]
-        if qid > 49:
+        if qid > 60:
             continue
         if qid not in questions:
             questions[qid] = []
@@ -29,7 +29,7 @@ def calculate_pass_rates(directory):
     num_samples_list = [len(samples) for samples in questions.values()]
     num_correct_list = [sum(1 for s in samples if s["correctness"]) for samples in questions.values()]
     overall_pass_rates = []
-    for k in range(1, 11):
+    for k in range(1, 33):
         rates = []
         for n, c in zip(num_samples_list, num_correct_list):
             rates.append(estimator(n, c, k))
@@ -52,18 +52,25 @@ def main():
         # "SkyThought/samples/Qwen2.5-14B-Instruct",
         # "SkyThought/samples/taco-qwen25-14B-qwen25-14b-tacofull",
         # "SkyThought/samples/s1_merge_lerp_0.7",
-        "SkyThought/samples/s1_merge_lerp_0.5_diff_MEDIUM",
-        "SkyThought/samples/s1_merge_lerp_0.7_diff_MEDIUM",
-        "SkyThought/samples/s1_merge_lerp_0.9_diff_MEDIUM",
-        "SkyThought/samples/s1_merge_lerp_0.5_diff_HARD",
-        "SkyThought/samples/s1_merge_lerp_0.7_diff_HARD",
-        "SkyThought/samples/s1_merge_lerp_0.9_diff_HARD",
+        # "SkyThought/samples/s1_merge_lerp_0.5_diff_MEDIUM",
+        # "SkyThought/samples/s1_merge_lerp_0.7_diff_MEDIUM",
+        # "SkyThought/samples/s1_merge_lerp_0.9_diff_MEDIUM",
+        # "SkyThought/samples/s1_merge_lerp_0.5_diff_HARD",
+        # "SkyThought/samples/s1_merge_lerp_0.7_diff_HARD",
+        # "SkyThought/samples/s1_merge_lerp_0.9_diff_HARD",
         # "SkyThought/samples/s1_merge_lerp_0.5",
-        "SkyThought/samples/s1-32B_diff_MEDIUM",
-        "SkyThought/samples/s1-32B_diff_HARD",
+        # "SkyThought/samples/s1-32B_diff_MEDIUM",
+        # "SkyThought/samples/s1-32B_diff_HARD",
+        "SkyThought/samples/qwen2.5-0.7_diff_HARD",
+        "SkyThought/samples/qwen2.5-0.7_diff_MEDIUM",
+        "SkyThought/samples/545e8f79628f602c00b0b60edf6c962746f121cb_diff_HARD",
+        "SkyThought/samples/545e8f79628f602c00b0b60edf6c962746f121cb_diff_MEDIUM",
+        "SkyThought/samples/r1-qwen2.5-32b-0.7_diff_HARD",
+        "SkyThought/samples/r1-qwen2.5-32b-0.7_diff_MEDIUM",
+        "SkyThought/samples/b950d47742676362558ae821ef2202f847ac8109_diff_MEDIUM"
     ]
 
-    k_values = list(range(1, 11))
+    k_values = list(range(1, 33))
     plt.figure(figsize=(8, 6))
     
     names = {
@@ -89,6 +96,13 @@ def main():
         "SkyThought/samples/s1_merge_lerp_0.7_diff_HARD": r"$\alpha_{lerp}=0.7$ (s1, HARD)",
         "SkyThought/samples/s1_merge_lerp_0.9_diff_HARD": r"$\alpha_{lerp}=0.9$ (s1, HARD)",
         "SkyThought/samples/s1_merge_lerp_0.5_diff_HARD": r"$\alpha_{lerp}=0.5$ (s1, HARD)",
+        "SkyThought/samples/qwen2.5-0.7_diff_HARD": r"$\alpha_{lerp}=0.7$ (Qwen2.5-s1, HARD)",
+        "SkyThought/samples/qwen2.5-0.7_diff_MEDIUM": r"$\alpha_{lerp}=0.7$ (Qwen2.5-s1, MEDIUM)",
+        "SkyThought/samples/545e8f79628f602c00b0b60edf6c962746f121cb_diff_HARD": r"$\alpha=1$ (s1, HARD)",
+        "SkyThought/samples/545e8f79628f602c00b0b60edf6c962746f121cb_diff_MEDIUM": r"$\alpha=1$ (s1, MEDIUM)",
+        "SkyThought/samples/r1-qwen2.5-32b-0.7_diff_HARD": r"$\alpha_{lerp}=0.7$ (r1 qwen 2.5, HARD)",
+        "SkyThought/samples/r1-qwen2.5-32b-0.7_diff_MEDIUM": r"$\alpha_{lerp}=0.7$ (r1 qwen 2.5, MEDIUM)",
+        "SkyThought/samples/b950d47742676362558ae821ef2202f847ac8109_diff_MEDIUM": r"$r1 \alpha=1$ (r1 qwen 2.5, MEDIUM)",
     }
     
     for directory in directories:
@@ -101,8 +115,8 @@ def main():
     plt.xlabel("k", fontsize=22)
     plt.ylabel("Pass@k", fontsize=22)
     plt.xticks(k_values, fontsize=22)
-    plt.yticks(np.arange(0, 0.8, 0.1), fontsize=22)
-    plt.ylim(0, 0.8)
+    plt.yticks(np.arange(0, 1, 0.1), fontsize=22)
+    plt.ylim(0, 1)
     plt.grid(False)
     plt.legend(fontsize=20, frameon=False, loc="lower right")
     plt.tight_layout()

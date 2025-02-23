@@ -46,6 +46,7 @@ def generate_traces(dataset, output_dir, system_prompt, batch_size=32, max_token
             print(i)
             batch = dataset.select(range(i, min(i+batch_size, len(dataset))))
             prompts = [example['question'] for example in batch]
+            print(len(prompts))
             
             try:
                 print('generating base')
@@ -53,13 +54,13 @@ def generate_traces(dataset, output_dir, system_prompt, batch_size=32, max_token
                 print('generating it')
                 # it_story = mm.generate_from_it(prompts, max_tokens=max_tokens_total)
                 print('generating both')
-                both_story = mm.generate_from_both(prompts, max_tokens_total=max_tokens_total, max_base_tokens=max_base_tokens, max_it_tokens=max_it_tokens)
+                both_story, _ = mm.generate_from_both(prompts, max_tokens_total=max_tokens_total, max_base_tokens=max_base_tokens, max_it_tokens=max_it_tokens)
                 
                 # Save each sample individually
                 for j, question in enumerate(prompts):
                     # Initialize counter for new questions
-                    if question not in samples_count:
-                        samples_count[question] = 0
+                    samples_count[question] = samples_count.get(question, 0)  # Initialize if not exists
+
                     
                     sample_data = {
                         "question": question,
@@ -107,8 +108,8 @@ def generate_traces(dataset, output_dir, system_prompt, batch_size=32, max_token
 def main(output_dir: str = 'data/traces'):
     # max_tokens_total = 4096
     max_tokens_total = 8192
-    max_base_tokens = 40
-    max_it_tokens = 60  
+    max_base_tokens = 100
+    max_it_tokens = 300
     temperature = 0.7
     repetitions = 8
     name_of_setting = f"{max_tokens_total}_{max_base_tokens}_{max_it_tokens}_{temperature}_{repetitions}"
@@ -120,7 +121,7 @@ def main(output_dir: str = 'data/traces'):
 
     generate_traces(data, 
                     os.path.join(output_dir, name_of_setting), 
-                    batch_size=32, 
+                    batch_size=128, 
                     max_tokens_total=max_tokens_total, 
                     max_base_tokens=max_base_tokens, 
                     max_it_tokens=max_it_tokens, 
