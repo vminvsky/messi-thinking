@@ -7,10 +7,21 @@ import glob
 from tqdm import tqdm
 from dotenv import load_dotenv
 import tiktoken
+import re 
 
 load_dotenv()
 
+def extract_content(text):
+    pattern = r'```(.*?)```'
+    match = re.search(pattern, text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
 def truncate_text(text, max_tokens=8000):
+    text = extract_content(text)
+    if text is None:
+        return None 
     encoding = tiktoken.get_encoding("cl100k_base")
     tokens = encoding.encode(text)
     if len(tokens) > max_tokens:
@@ -20,7 +31,7 @@ def truncate_text(text, max_tokens=8000):
 
 
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), max_retries=2, timeout=10.0)
 
 def embed_text(text: str, dimensions: int = 150) -> List[float]:
     """
@@ -33,6 +44,8 @@ def embed_text(text: str, dimensions: int = 150) -> List[float]:
     Returns:
         List[float]: Embedding vector
     """
+    if text is None:
+        return None 
     try:
         response = client.embeddings.create(
             model="text-embedding-3-small",
@@ -57,8 +70,8 @@ def process_file(file_path: str, output_dir: str) -> Dict:
         Dict: Dictionary containing the original data and its embeddings, or None if skipped
     """
     # Only process files with 'converted' prefix
-    if not os.path.basename(file_path).startswith('converted'):
-        return None
+    # if not os.path.basename(file_path).startswith('converted'):
+    #     return None
     
     question_num = int(file_path.split('question_')[1].split('_')[0])
     if question_num > 499:
@@ -80,13 +93,13 @@ def process_file(file_path: str, output_dir: str) -> Dict:
                 data = json.load(f)
             
         # Check for required fields
-        if 'generated_text' not in data:
+        if 'output' not in data:
             print(f"Warning: 'generated_text' not found in {file_path}")
             return None
             
         # Generate missing embeddings
         if 'generated_embedding' not in data:
-            generated_embedding = embed_text(truncate_text(data['generated_text']))
+            generated_embedding = embed_text(truncate_text(data['output']))
             if generated_embedding:
                 data['generated_embedding'] = generated_embedding
             
@@ -147,14 +160,18 @@ def process_directory(input_dir: str, output_dir: str, max_workers: int = 4):
 
 if __name__ == "__main__":
     # Example usage
-    run_name = "taco_instruct_llama_8b_single_slerp_0.5/"
-    input_directory = f"/scratch/gpfs/bs6865/messi-thinking/{run_name}"
+    # run_name = "taco_instruct_llama_8b_single_slerp_0.5/"
+    input_directory = f"/scratch/gpfs/bs6865/messi-thinking/SkyThought/samples/"
+    run_names = glob.glob(input_directory + '*_nosysprompt')
+    print(run_names)
     # input_directory = f"/scratch/gpfs/vv7118/projects/messi-thinking/{run_name}"
-    output_directory = f"embeddings/{run_name}"
-    os.makedirs(output_directory, exist_ok=True)
-    
-    process_directory(
-        input_directory,
-        output_directory,
-        max_workers=10  # Adjust based on your needs
-    )
+    for run_name in tqdm(run_names):
+        fname = run_name.split('/')[-1]
+        output_directory = f"embeddings/{fname}"
+        os.makedirs(output_directory, exist_ok=True)
+        
+        process_directory(
+            run_name,
+            output_directory,
+            max_workers=10  # Adjust based on your needs
+        )
