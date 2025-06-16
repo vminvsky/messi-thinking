@@ -3,7 +3,7 @@ NODE_NAME=della-l08g4
 CLUSTER_NUMBER=2
 
 # Start deepseek server in a detached screen session
-screen -dmS ${CLUSTER_NUMBER}_v2 ssh -t $NODE_NAME "cd /scratch/gpfs/bs6865/messi-thinking && \
+screen -dmS ${CLUSTER_NUMBER}_v2 ssh -t $NODE_NAME "cd /scratch/gpfs/vv7118/projects/messi-thinking && \
 export HF_HUB_OFFLINE=1 && \
 export HF_HOME="/scratch/gpfs/bs6865/reasoning-agents/_cache" && \
 conda activate vllm && \

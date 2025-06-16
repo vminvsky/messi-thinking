@@ -130,7 +130,7 @@ async def main(model_flag, begin_idx):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", choices=["base", "instruct"], required=True, help="Select model for inference (base or instruct)")
-    parser.add_argument("--instruct_model", required=True, help="Path to instruct model")
+    parser.add_argument("--instruct_model", default=None,required=False, help="Path to instruct model")
     parser.add_argument("--max_tokens", type=int, default=8192, help="Maximum tokens for generation")
     parser.add_argument("--num_samples", type=int, default=10, help="Number of samples per dataset entry")
     parser.add_argument("--output_dir", required=True, help="Output directory for generated files")

@@ -133,12 +133,12 @@ textual==1.0.0
 tiktoken==0.7.0
 tokenizers==0.21.0
 tomli==2.2.1
-torch==2.5.1
 torchaudio==2.5.1
 torchvision==0.20.1
 tqdm==4.66.5
 transformers==4.48.2
 triton==3.1.0
+torch
 typing_extensions==4.12.2
 tzdata==2024.1
 uc-micro-py==1.0.3
